@@ -64,8 +64,15 @@ pnpm db:restore      # drill de restauração contra banco LOCAL (ver 06)
 | `pnpm db:seed:admin`      | primeiro administrador (senha temporária)      |
 | `pnpm db:seed:categorias` | categorias oficiais                            |
 | `pnpm db:seed:config`     | os 11 parâmetros operacionais (`configuracao`) |
+| `pnpm db:seed:legais`     | termos de uso, privacidade e ROPA (versão 2.0) |
 
 Todos são idempotentes na medida do possível: rodar de novo não duplica dados.
+
+O `db:seed:legais` publica os documentos legais que as páginas `/termos` e
+`/privacidade` renderizam: ele grava a versão nova como vigente e aposenta
+(`vigente = false`) as anteriores do mesmo tipo, numa transação. O conteúdo
+fica em `src/scripts/documentos-legais/` — para corrigir um texto, edite lá e
+rode de novo com uma `versao` maior em `index.ts`.
 
 ## Problemas comuns
 
