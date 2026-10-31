@@ -59,12 +59,13 @@ pnpm db:restore      # drill de restauração contra banco LOCAL (ver 06)
 
 ## Seeds
 
-| Comando                   | O que cria                                     |
-| ------------------------- | ---------------------------------------------- |
-| `pnpm db:seed:admin`      | primeiro administrador (senha temporária)      |
-| `pnpm db:seed:categorias` | categorias oficiais                            |
-| `pnpm db:seed:config`     | os 11 parâmetros operacionais (`configuracao`) |
-| `pnpm db:seed:legais`     | termos de uso, privacidade e ROPA (versão 2.0) |
+| Comando                   | O que cria                                        |
+| ------------------------- | ------------------------------------------------- |
+| `pnpm db:seed:admin`      | primeiro administrador (senha temporária)         |
+| `pnpm db:seed:categorias` | categorias oficiais                               |
+| `pnpm db:seed:config`     | os 11 parâmetros operacionais (`configuracao`)    |
+| `pnpm db:seed:legais`     | termos de uso, privacidade e ROPA (versão 2.0)    |
+| `pnpm db:geocodificar`    | coordenadas das fichas (alimenta o mapa da ficha) |
 
 Todos são idempotentes na medida do possível: rodar de novo não duplica dados.
 
