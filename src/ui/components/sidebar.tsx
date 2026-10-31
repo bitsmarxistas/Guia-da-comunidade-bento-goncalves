@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/components/button";
@@ -48,16 +49,32 @@ const navigation: NavItem[] = [
  */
 const ADMIN_RAIZ = "admin@guiabg.com.br";
 
-export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
+export function Sidebar({
+  admin,
+  aberto = false,
+  aoFechar,
+}: {
+  admin: { nome: string; email: string };
+  /** Drawer aberto no mobile (controlado pelo AdminShell). */
+  aberto?: boolean;
+  aoFechar?: () => void;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
+      /*
+       * No mobile o menu é um drawer: fora da tela por padrão e sobrepondo o
+       * conteúdo com fundo escurecido. Em telas grandes fica fixo. Antes ele
+       * era fixo em todas as larguras e cobria 256 px do conteúdo no celular.
+       */
       className={cn(
-        "fixed top-0 left-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200",
+        "fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 lg:z-40 lg:translate-x-0",
         collapsed ? "w-16" : "w-64",
+        aberto ? "translate-x-0 shadow-xl" : "-translate-x-full",
       )}
+      aria-label="Menu do painel"
     >
       {/* Marca */}
       <div
@@ -88,9 +105,18 @@ export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
         <Button
           variant="ghost"
           size="icon"
+          onClick={() => aoFechar?.()}
+          className="h-10 w-10 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring lg:hidden"
+          aria-label="Fechar menu"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "h-10 w-10 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring",
+            "hidden h-10 w-10 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring lg:inline-flex",
             collapsed && "mx-auto",
           )}
           aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -127,6 +153,7 @@ export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
               <li key={item.name}>
                 <Link
                   href={item.href}
+                  onClick={() => aoFechar?.()}
                   className={cn(
                     "relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring",

@@ -37,6 +37,14 @@
   --color-sun-tint: var(--sun-tint);
   --color-sun-ink: var(--sun-ink);
 
+  /* Rodapé: painel escuro nos dois temas, com tokens próprios. */
+  --color-footer: var(--footer-bg);
+  --color-footer-foreground: var(--footer-fg);
+  --color-footer-muted: var(--footer-muted);
+  --color-footer-border: var(--footer-border);
+  --color-footer-brand: var(--footer-brand);
+  --color-footer-hover: var(--footer-hover);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -85,6 +93,14 @@
   --brand-wash: #fdf1f3;
   --on-brand: #ffffff;
 
+  /* Rodapé (tema claro): painel escuro da marca */
+  --footer-bg: #1c1618;
+  --footer-fg: #f7eff0;
+  --footer-muted: #b3a1a5;
+  --footer-border: #332629;
+  --footer-brand: #ff6b80;
+  --footer-hover: #ff9aaa;
+
   /* Superfícies */
   --canvas: #f7f4f4;
   --surface: #ffffff;
@@ -93,7 +109,9 @@
   /* Texto */
   --ink: #1c1618;
   --ink-soft: #574e51;
-  --ink-mute: #83787b;
+  /* 5,3:1 sobre --surface e 4,8:1 sobre --canvas (WCAG AA pede 4,5:1).
+     O valor anterior (#83787b) media 4,25:1 e reprovava em texto de 13 px. */
+  --ink-mute: #6b5f62;
 
   /* Linhas */
   --line: #e7e0e2;
@@ -156,6 +174,14 @@
   --brand-tint: #3a121c;
   --brand-wash: #2a0d14;
   --on-brand: #2b0710;
+
+  /* Rodapé (tema escuro): mais escuro que o canvas, para destacar sem inverter */
+  --footer-bg: #0a0708;
+  --footer-fg: #f3e9ea;
+  --footer-muted: #a89a9d;
+  --footer-border: #2a1f21;
+  --footer-brand: #ff8fa0;
+  --footer-hover: #ffb3bf;
 
   --canvas: #120d0e;
   --surface: #1a1416;

@@ -11,7 +11,9 @@ import { ThemeToggle } from "@/ui/components/theme-toggle";
 const LINKS = [
   { href: "/", rotulo: "Início" },
   { href: "/catalogo", rotulo: "Descobrir" },
-  { href: "/catalogo#categorias", rotulo: "Categorias" },
+  // O bloco de categorias vive na home; antes apontava para /catalogo#categorias,
+  // âncora que não existia nessa página.
+  { href: "/#categorias", rotulo: "Categorias" },
 ];
 
 export function HeaderNav({ logado }: { logado: boolean }) {
@@ -49,10 +51,12 @@ export function HeaderNav({ logado }: { logado: boolean }) {
         <nav aria-label="Navegação principal" className="hidden md:block">
           <ul className="flex items-center gap-1">
             {LINKS.map((link) => {
-              const ativo =
-                link.href === "/"
+              const semHash = link.href.split("#")[0] ?? "";
+              const ativo = link.href.includes("#")
+                ? false
+                : semHash === "/"
                   ? pathname === "/"
-                  : pathname.startsWith(link.href.split("#")[0] ?? "");
+                  : pathname.startsWith(semHash);
               return (
                 <li key={link.href}>
                   <Link
