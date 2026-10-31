@@ -311,7 +311,7 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
                     )
                   }
                 />
-                <span className="inline-flex h-9 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand">
+                <span className="inline-flex h-11 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand">
                   {categoria.nome}
                 </span>
               </label>

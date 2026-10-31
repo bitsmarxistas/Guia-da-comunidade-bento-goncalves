@@ -96,7 +96,17 @@ export function SiteFooter() {
             © {new Date().getFullYear()} GuiaBG. Conteúdo enviado pela
             comunidade.
           </p>
-          <p>Bento Gonçalves · Serra Gaúcha</p>
+          <p className="flex flex-wrap items-center gap-3">
+            <span>Bento Gonçalves · Serra Gaúcha</span>
+            <a
+              href="https://github.com/LeonardoMonteblanc/portfolio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-4 hover:text-footer-hover hover:underline"
+            >
+              Código aberto
+            </a>
+          </p>
         </div>
       </div>
     </footer>

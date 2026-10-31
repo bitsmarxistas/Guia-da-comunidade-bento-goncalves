@@ -139,7 +139,7 @@ export function NegocioCard({ negocio, prioridade = false }: NegocioCardProps) {
               href={`https://wa.me/55${whatsapp.valor.replace(/\D/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative z-10 inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-line px-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+              className="relative z-10 inline-flex h-11 items-center gap-1.5 rounded-[8px] border border-line px-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
               aria-label={`WhatsApp de ${negocio.nome}: ${formatarTelefone(whatsapp.valor)}`}
             >
               <GlifoWhatsApp className="size-4 text-positive" />

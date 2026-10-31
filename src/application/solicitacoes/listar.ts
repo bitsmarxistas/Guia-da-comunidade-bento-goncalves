@@ -81,6 +81,9 @@ export async function listarSolicitacoesAction(
         nomeNegocio: sql<
           string | null
         >`${solicitacao.dadosNegocioProposto}->>'nome'`,
+        bairro: sql<
+          string | null
+        >`${solicitacao.dadosNegocioProposto}->'localizacao'->>'bairro'`,
         nomeSolicitante: solicitante.nome,
         emailSolicitante: solicitante.email,
       })

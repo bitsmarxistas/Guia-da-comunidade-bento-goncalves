@@ -200,6 +200,7 @@ export default async function SolicitacoesPage({
                           </p>
                           <p className="font-mono text-xs text-ink-mute">
                             {sol.protocolo}
+                            {sol.bairro ? ` · ${sol.bairro}` : ""}
                           </p>
                         </div>
                       </TableCell>

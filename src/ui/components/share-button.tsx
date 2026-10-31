@@ -89,27 +89,36 @@ export const ShareButton = forwardRef<HTMLButtonElement, ShareButtonProps>(
     }, [url, title, text, shareSupported, copyToClipboard]);
 
     return (
-      <Button
-        ref={ref}
-        variant={variant}
-        size={size}
-        onClick={handleShare}
-        className={cn(className)}
-        aria-label="Compartilhar"
-        {...props}
-      >
-        {copied ? (
-          <>
-            <Check className="h-4 w-4" />
-            <span className="sr-only">Link copiado</span>
-          </>
-        ) : (
-          <Share2 className="h-4 w-4" aria-hidden="true" />
-        )}
-        <span className="hidden sm:inline ml-1">
-          {copied ? "Copiado!" : "Compartilhar"}
+      <>
+        {/*
+          Região viva: o texto do botão muda para "Copiado!", mas leitor de
+          tela não anuncia a mudança de rótulo de um botão já focado.
+        */}
+        <span role="status" aria-live="polite" className="sr-only">
+          {copied ? "Link copiado para a área de transferência." : ""}
         </span>
-      </Button>
+        <Button
+          ref={ref}
+          variant={variant}
+          size={size}
+          onClick={handleShare}
+          className={cn(className)}
+          aria-label="Compartilhar"
+          {...props}
+        >
+          {copied ? (
+            <>
+              <Check className="h-4 w-4" />
+              <span className="sr-only">Link copiado</span>
+            </>
+          ) : (
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+          )}
+          <span className="hidden sm:inline ml-1">
+            {copied ? "Copiado!" : "Compartilhar"}
+          </span>
+        </Button>
+      </>
     );
   },
 );

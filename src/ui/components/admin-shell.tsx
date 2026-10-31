@@ -14,9 +14,12 @@ import { Header } from "@/ui/components/header";
 export function AdminShell({
   admin,
   children,
+  contadores,
 }: {
   admin: { nome: string; email: string };
   children: React.ReactNode;
+  /** Itens da fila por rota — a sidebar mostra o número. */
+  contadores?: Record<string, number>;
 }) {
   const [menuAberto, setMenuAberto] = useState(false);
 
@@ -44,6 +47,7 @@ export function AdminShell({
         admin={admin}
         aberto={menuAberto}
         aoFechar={() => setMenuAberto(false)}
+        contadores={contadores}
       />
 
       <div className="lg:pl-64">

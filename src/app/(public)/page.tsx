@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { buscarNegocios, listarCategoriasAtivas } from "@/application/catalogo";
 import { Button } from "@/ui/components/button";
+import { ImagemNegocio, primeiraImagem } from "@/ui/components/imagem-negocio";
 import { NegocioCard } from "./_components/negocio-card";
 import { Carrossel } from "./_components/carrossel";
 import { JsonLd } from "./_components/dados-estruturados";
@@ -219,8 +220,9 @@ export default async function HomePage() {
                 <li key={categoria.id}>
                   <Link
                     href={`/catalogo?categoria=${categoria.slug}`}
-                    className="inline-flex h-9 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft transition-colors hover:border-brand hover:text-brand"
+                    className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-[13px] font-semibold text-ink-soft transition-colors hover:border-brand hover:text-brand"
                   >
+                    <IconeCategoria slug={categoria.slug} />
                     {categoria.nome}
                   </Link>
                 </li>
@@ -306,23 +308,31 @@ export default async function HomePage() {
         <section className="border-b border-line bg-canvas">
           <div className="container-page grid gap-8 py-14 md:grid-cols-2 md:items-center md:py-16">
             <div className="relative aspect-[3/2] overflow-hidden rounded-[22px] border border-line bg-brand-tint">
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-brand"
-              >
-                <Building2 className="size-10" />
-                <span className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold">
-                  {destaque.nome
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((parte) => parte[0])
-                    .join("")
-                    .toUpperCase()}
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-strong">
-                  {destaque.categorias[0]?.nome ?? "Comércio local"}
-                </span>
-              </div>
+              {primeiraImagem(destaque.imagens, "foto") ? (
+                <ImagemNegocio
+                  url={primeiraImagem(destaque.imagens, "foto") as string}
+                  alt={`Foto de ${destaque.nome}`}
+                  sizes="(min-width: 768px) 46vw, 92vw"
+                />
+              ) : (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-brand"
+                >
+                  <Building2 className="size-10" />
+                  <span className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold">
+                    {destaque.nome
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((parte) => parte[0])
+                      .join("")
+                      .toUpperCase()}
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-strong">
+                    {destaque.categorias[0]?.nome ?? "Comércio local"}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div>

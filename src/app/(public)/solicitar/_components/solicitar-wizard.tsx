@@ -193,6 +193,8 @@ export function SolicitarWizard() {
   const [verificandoDuplicata, setVerificandoDuplicata] = useState(false);
 
   const focoSucesso = useRef<HTMLButtonElement>(null);
+  // Caixa do diálogo de sucesso: usada para prender o Tab dentro dele.
+  const caixaSucesso = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/categorias")
@@ -648,7 +650,7 @@ export function SolicitarWizard() {
                           )
                         }
                       />
-                      <span className="inline-flex h-9 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--focus)]">
+                      <span className="inline-flex h-11 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--focus)]">
                         {categoria.nome}
                       </span>
                     </label>
@@ -852,7 +854,7 @@ export function SolicitarWizard() {
                     Fotos
                   </h2>
                   <p className="mt-1 text-sm text-ink-soft">
-                    Até 5 fotos em JPG ou PNG, com no máximo 5 MB cada. As
+                    Até 4 fotos em JPG ou PNG, com no máximo 5 MB cada. As
                     imagens passam por moderação antes de aparecer.
                   </p>
                 </div>
@@ -925,7 +927,7 @@ export function SolicitarWizard() {
                               intervaloAtivo: false,
                             }))
                           }
-                          className="inline-flex h-9 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
+                          className="inline-flex h-11 items-center rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
                         >
                           {faixa.rotulo}
                         </button>
@@ -1205,16 +1207,40 @@ export function SolicitarWizard() {
 
       {sucesso ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#120d0e]/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
           role="presentation"
           onClick={(evento) => {
             if (evento.target === evento.currentTarget) fecharSucesso();
           }}
           onKeyDown={(evento) => {
             if (evento.key === "Escape") fecharSucesso();
+            if (evento.key !== "Tab") return;
+
+            /*
+             * Prende o foco no diálogo (§4): sem isto o Tab saía do pop-up e
+             * ia para os campos do formulário atrás do overlay, onde o
+             * teclado navegava sem enxergar.
+             */
+            const caixa = caixaSucesso.current;
+            if (!caixa) return;
+            const focaveis = caixa.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            );
+            if (focaveis.length === 0) return;
+            const primeiro = focaveis[0];
+            const ultimo = focaveis[focaveis.length - 1];
+            if (!primeiro || !ultimo) return;
+            if (evento.shiftKey && document.activeElement === primeiro) {
+              evento.preventDefault();
+              ultimo.focus();
+            } else if (!evento.shiftKey && document.activeElement === ultimo) {
+              evento.preventDefault();
+              primeiro.focus();
+            }
           }}
         >
           <div
+            ref={caixaSucesso}
             role="dialog"
             aria-modal="true"
             aria-labelledby="titulo-sucesso"

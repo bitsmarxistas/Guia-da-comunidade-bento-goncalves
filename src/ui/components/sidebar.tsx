@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  ScrollText,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,11 +54,14 @@ export function Sidebar({
   admin,
   aberto = false,
   aoFechar,
+  contadores,
 }: {
   admin: { nome: string; email: string };
   /** Drawer aberto no mobile (controlado pelo AdminShell). */
   aberto?: boolean;
   aoFechar?: () => void;
+  /** Itens da fila por rota (ex.: solicitações recebidas). */
+  contadores?: Record<string, number>;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -144,6 +148,11 @@ export function Sidebar({
                     href: "/admin/administradores",
                     icon: ShieldCheck,
                   } as NavItem,
+                  {
+                    name: "Auditoria",
+                    href: "/admin/auditoria",
+                    icon: ScrollText,
+                  } as NavItem,
                 ]
               : []),
           ].map((item) => {
@@ -175,6 +184,14 @@ export function Sidebar({
                     aria-hidden="true"
                   />
                   {!collapsed && <span className="truncate">{item.name}</span>}
+                  {contadores?.[item.href] ? (
+                    <span
+                      className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[0.6875rem] font-semibold text-on-brand"
+                      aria-label={`${contadores[item.href]} pendente(s)`}
+                    >
+                      {contadores[item.href]}
+                    </span>
+                  ) : null}
                   {!collapsed && item.restrito ? (
                     <span className="ml-auto rounded-full border border-sidebar-border px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase">
                       restrito

@@ -261,7 +261,7 @@ export async function CatalogoView({
                   {categoriasPrincipais.map((categoria) => (
                     <label
                       key={categoria.id}
-                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
+                      className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
                     >
                       <input
                         type="checkbox"
@@ -278,14 +278,14 @@ export async function CatalogoView({
 
                   {categoriasOcultas.length > 0 ? (
                     <details className="pt-1">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-[8px] px-1 text-[13px] font-semibold text-brand hover:underline">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[8px] px-1 text-[13px] font-semibold text-brand hover:underline">
                         + {categoriasOcultas.length} categorias
                       </summary>
                       <div className="space-y-1 pt-1">
                         {categoriasOcultas.map((categoria) => (
                           <label
                             key={categoria.id}
-                            className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
+                            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
                           >
                             <input
                               type="checkbox"
@@ -313,7 +313,7 @@ export async function CatalogoView({
                   {bairros.map((bairro) => (
                     <label
                       key={bairro.bairro}
-                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
+                      className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
                     >
                       <input
                         type="checkbox"
@@ -469,7 +469,7 @@ function Chip({
     <Link
       href={href}
       className={[
-        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors",
+        "inline-flex h-11 items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold transition-colors",
         ativo
           ? "border-brand bg-brand text-on-brand hover:bg-brand-strong"
           : "border-line bg-surface text-ink-soft hover:border-brand hover:text-brand",

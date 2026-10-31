@@ -379,13 +379,13 @@ export default async function NegocioPage({
                 <Link
                   key={categoria.id}
                   href={`/catalogo?categoria=${categoria.slug}`}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
                 >
                   <Tag className="size-3.5" aria-hidden="true" />
                   {categoria.nome}
                 </Link>
               ))}
-              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-tint px-3 text-[13px] font-semibold text-brand-strong">
+              <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-brand-tint px-3 text-[13px] font-semibold text-brand-strong">
                 <ShieldCheck className="size-3.5" aria-hidden="true" />
                 Do guia
               </span>

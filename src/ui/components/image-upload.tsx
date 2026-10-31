@@ -65,8 +65,9 @@ interface FileUploadProps {
 export function ImageUpload({
   label = "Imagens",
   description = "Arraste ou clique para adicionar imagens (JPEG, PNG, WebP - máx 5MB)",
-  maxFiles = 5,
-  acceptedTypes = ["image/jpeg", "image/png", "image/webp"],
+  // Guia (§5.5): até 4 fotos, JPG ou PNG.
+  maxFiles = 4,
+  acceptedTypes = ["image/jpeg", "image/png"],
   maxSizeMB = 5,
   tipo = "foto",
   solicitacaoId,

@@ -66,6 +66,16 @@ interface DadosNegocioProposto {
   }>;
 }
 
+const DIAS_SEMANA = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
+
 const TIPO_LABELS: Record<string, string> = {
   inclusao: "Inclusão",
   // Chamado de correção: aponta para um comércio existente e pede mudanças.
@@ -280,8 +290,8 @@ export default async function SolicitacaoDetailPage({
                   <div className="space-y-1 text-sm">
                     {(dados.horarios as any[]).map((h: any, i: number) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className="font-medium capitalize">
-                          Dia {h.diaSemana}:
+                        <span className="font-medium">
+                          {DIAS_SEMANA[h.diaSemana] ?? "Dia"}:
                         </span>
                         <span>
                           {h.horaAbertura} - {h.horaFechamento}
@@ -428,8 +438,8 @@ export default async function SolicitacaoDetailPage({
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-ink-soft">
               <div className="flex justify-between">
-                <span>ID</span>
-                <span className="font-mono text-xs">{sol.id}</span>
+                <span>Protocolo</span>
+                <span className="font-mono text-xs">{sol.protocolo}</span>
               </div>
               <div className="flex justify-between">
                 <span>Criada em</span>
