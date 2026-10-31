@@ -130,7 +130,9 @@ export function destinoR2(
 /** Diretório local — dev, drill de restauração e testes. */
 export function destinoDiretorio(raiz: string): DestinoBackup {
   // `resolve` (e não `join`) porque `--dir C:\\backups` precisa continuar absoluto.
-  const absoluto = resolve(process.cwd(), raiz);
+  // `turbopackIgnore` evita que o bundler trate este caminho dinâmico como
+  // dependência do projeto inteiro (o build avisava que empacotaria tudo).
+  const absoluto = resolve(/*turbopackIgnore: true*/ process.cwd(), raiz);
 
   return {
     nome: "diretorio",

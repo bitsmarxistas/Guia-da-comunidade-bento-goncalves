@@ -13,8 +13,9 @@
 | App (Next.js 16.4.3, App Router, RSC, Turbopack) | `portfolio/`                                                     |
 | Fonte da verdade (produto)                       | `../DOCUMENTACAO/docs/` — backlog em `05-execucao/01-backlog.md` |
 | Identidade visual (obrigatória em UI)            | `../docs-identidade-visual/GuiaBG_proposta_UI_UX_FINAL.md`       |
-| Guia de prompt de auditoria                      | `../orientacoes.md`                                              |
-| Relatórios do agente anterior                    | `auditoria-backlog.md`, `validacao-requisitos.md`                |
+| Guia de prompt de auditoria                      | `../orientacoes.md` (fora do repo)                               |
+| Guia de frontend aprovado                        | `docs-dev/08-guia-frontend-aprovado.md`                          |
+| Relatórios históricos (não são estado atual)     | `docs-dev/_arquivo/`                                             |
 
 Camadas: `src/domain` (puro: entidades, enums, regras RN01–RN38, MEs, utils) → `src/application` (casos de uso: catalogo, solicitacoes, negocios, categorias, governanca, midia, lgpd) → `src/infrastructure` (drizzle/Neon, auth JWT, R2, email, audit, queue) → `src/app` (rotas) → `src/ui/components` (shadcn-like).
 
@@ -90,7 +91,7 @@ Já aplicado por ele no Neon: `log_auditoria`, `log_anonimizacao`, `log_configur
 4. **Numeração de migrations colidida**: dois `0010_*`, dois `0011_*`, e `0012`/`0013` fora do `_journal.json` (que só registra `0011_broken_guardian`). Por isso `src/scripts/migrate.ts` virou uma pilha de `ALTER TABLE IF NOT EXISTS`. Próximo `drizzle-kit generate` vai gerar snapshot divergente.
 5. **`buscarNegocios`**: `total` da paginação ignora `q`/filtros (`db.$count` sem as condições) — F4-05/F4-07 vão paginar errado.
 6. **UI fora do guia**: sidebar/header usam azul (`blue-600/50/700`) e marca "D"/"Diretório"; guia exige `#C41E3A` / "GuiaBG". Hero diz "Encontre o melhor de Bento Gonçalves"; o guia aprova "Bento Gonçalves se encontra aqui".
-7. **`validacao-requisitos.md` afirma "todas as telas conformes"** e "F4 concluída" — as evidências acima desmentem. Não trate esse relatório como estado real; trate como intenção.
+7. **`docs-dev/_arquivo/validacao-requisitos.md` afirma "todas as telas conformes"** e "F4 concluída" — as evidências acima desmentem. Não trate esse relatório como estado real; trate como intenção.
 8. Card do catálogo usa `<article role="button">` com `<button>` dentro (interativo aninhado → violação a11y A11Y-01). Corrigir junto com a página `/catalogo`.
 
 ---
@@ -296,7 +297,7 @@ Estado verificado em produção (`https://guiabg.com.br`): `/`, `/catalogo`, `/c
 
 ### 9.10 Interface aprovada implementada (31/10, sétima parte)
 
-Fases 1 a 5 do guia de frontend (`ORIENTACOES-DEEPSEEK.md`). Não toquei em
+Fases 1 a 5 do guia de frontend (`docs-dev/08-guia-frontend-aprovado.md`). Não toquei em
 `src/domain`, `src/infrastructure` nem em `src/application` (única adição: um caso
 de uso de leitura de termos vigentes para as páginas legais).
 

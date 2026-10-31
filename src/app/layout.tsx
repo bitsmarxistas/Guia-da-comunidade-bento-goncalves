@@ -39,20 +39,18 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     siteName: "GuiaBG",
     url: "/",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "GuiaBG" }],
+    // A imagem de compartilhamento vem de `opengraph-image.tsx` (convenção de
+    // arquivo do App Router): declarar o caminho aqui duplicava e apontava para
+    // um arquivo que não existia.
   },
   twitter: {
     card: "summary_large_image",
     title: "GuiaBG — comércios e serviços de Bento Gonçalves",
     description: "Guia comunitário de comércios e serviços de Bento Gonçalves.",
   },
-  icons: {
-    icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
-    ],
-    apple: [{ url: "/favicon-180.png", sizes: "180x180" }],
-  },
+  // Ícones: `icon.svg` e `apple-icon.png` na raiz de `src/app` são servidos pela
+  // convenção de arquivo do Next. Declarar caminhos aqui duplicava a tag e
+  // apontava para arquivos inexistentes.
 };
 
 export const viewport: Viewport = {

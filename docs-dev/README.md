@@ -20,6 +20,8 @@ ela é a fonte da verdade.
 | [05 — Replicar em outra cidade](./05-replicar-em-outra-cidade.md) | checklist de fork e o que é local a cada cidade        |
 | [06 — Banco e migrations](./06-banco-e-migrations.md)             | schema, regras de migration, drift e como diagnosticar |
 | [07 — Interface](./07-interface.md)                               | design system, shell, telas e como o horário é salvo   |
+| [08 — Guia de frontend aprovado](./08-guia-frontend-aprovado.md)  | spec visual e de comportamento aprovada (referência)   |
+| [Arquivo](./_arquivo/README.md)                                   | relatórios históricos (não são estado atual)           |
 
 ## Tour de 30 segundos
 
@@ -29,11 +31,12 @@ src/
   application/     # casos de uso (server actions e serviços): catálogo, solicitações,
                    # negócios, categorias, governança, mídia, LGPD, configuração
   infrastructure/  # Drizzle + Neon, JWT, R2/S3, e-mail (Resend), fila (Postgres), auditoria
-  app/             # rotas Next (App Router): (public), (admin), (legal), api
+  app/             # rotas Next (App Router): (public), (admin), api
   ui/components/   # componentes de interface (shadcn-like)
   shared/          # env validado, logger
 tests/unit         # domínio puro, sem banco
 tests/integration  # sobe um Postgres local e aplica as migrations de verdade
+tests/e2e          # Playwright contra build de produção
 ```
 
 Regra de dependência: **domain não importa nada de fora**. `application` pode
