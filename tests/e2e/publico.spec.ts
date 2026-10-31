@@ -54,7 +54,20 @@ test.describe("catálogo público", () => {
     await expect(
       page.getByRole("link", { name: /Falar no WhatsApp/i }),
     ).toBeVisible();
-    await expect(page.getByText(/Rua Marechal Floriano/)).toBeVisible();
+
+    // O endereço aparece na ficha (informações) e no bloco do mapa: a asserção
+    // é no bloco "Onde fica", que também prova o mapa e o link de rota.
+    const ondeFica = page.getByRole("region", { name: /Onde fica/i });
+    await expect(ondeFica.getByText(/Rua Marechal Floriano/)).toBeVisible();
+    await expect(
+      ondeFica.getByRole("link", { name: /Abrir no mapa/i }),
+    ).toBeVisible();
+
+    // Horário de funcionamento junto das informações do comércio.
+    await expect(page.getByText(/Horário de hoje/i)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /^Horários$/i }),
+    ).toBeVisible();
   });
 
   test("slug inexistente responde 404", async ({ page }) => {

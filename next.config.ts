@@ -40,6 +40,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
       `connect-src ${connectSrc}`,
+      // Mapa da ficha: embed do OpenStreetMap (sem chave de API).
+      "frame-src 'self' https://www.openstreetmap.org",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -54,6 +56,20 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+
+  /*
+   * O otimizador de imagem só aceita host declarado aqui. São exatamente os
+   * hosts que a moderação grava em `imagem.url` (R2 e o domínio de assets);
+   * `podeExibirImagem()` repete a lista do lado do componente para não
+   * renderizar um host que o otimizador recusaria.
+   */
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "assets.seudominio.com.br" },
+      { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+      { protocol: "https", hostname: "guiabg.com.br" },
+    ],
+  },
 
   async headers() {
     return [

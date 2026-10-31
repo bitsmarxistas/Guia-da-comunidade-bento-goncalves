@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  Building2,
   CalendarClock,
   Clock,
   ExternalLink,
@@ -18,6 +17,9 @@ import { Button } from "@/ui/components/button";
 import { ShareButton } from "@/ui/components/share-button";
 import { GlifoInstagram, GlifoWhatsApp } from "@/ui/components/brand/glifos";
 import { JsonLd } from "@/app/(public)/_components/dados-estruturados";
+import { GaleriaNegocio } from "@/app/(public)/_components/galeria-negocio";
+import { MapaEndereco } from "@/app/(public)/_components/mapa-endereco";
+import { comporEndereco } from "@/domain/utils/endereco";
 
 export const revalidate = 60;
 
@@ -71,17 +73,6 @@ function agoraEmSaoPaulo() {
 function emMinutos(hora: string): number {
   const [h, m] = hora.split(":");
   return Number(h) * 60 + Number(m ?? 0);
-}
-
-function iniciais(nome: string): string {
-  return nome
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((parte) => parte[0])
-    .join("")
-    .toUpperCase();
 }
 
 type NegocioComRelacoes = NonNullable<
@@ -178,14 +169,13 @@ export async function generateMetadata({
   const { slug } = await params;
   const negocio = await buscarNegocioPorSlug(slug);
 
-  if (!negocio) {
-    return {
-      title: "Comércio não encontrado",
-      description:
-        "Este comércio não está publicado ou o endereço mudou. Volte ao catálogo para encontrar outros comércios e serviços de Bento Gonçalves.",
-      robots: { index: false, follow: false },
-    };
-  }
+  /*
+   * O notFound() precisa acontecer aqui: o metadata é resolvido antes do
+   * streaming da página, então é o único ponto em que o status HTTP ainda pode
+   * ser 404. Chamando só no corpo, o cabeçalho já saiu com 200 e a URL
+   * inexistente respondia 200 (ruim para SEO e para monitoramento).
+   */
+  if (!negocio) notFound();
 
   const url = `${urlSite}/negocio/${encodeURIComponent(slug)}`;
   const titulo = montarTitulo(negocio);
@@ -377,21 +367,12 @@ export default async function NegocioPage({
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
           <div>
-            {/* Galeria: capa 3:2 + fallback desenhado */}
-            <div className="relative aspect-[3/2] overflow-hidden rounded-[22px] border border-line bg-brand-tint">
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-brand"
-              >
-                <Building2 className="size-12" />
-                <span className="font-[family-name:var(--font-fraunces)] text-4xl font-semibold">
-                  {iniciais(negocio.nome)}
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-strong">
-                  {categorias[0]?.nome ?? "Comércio local"}
-                </span>
-              </div>
-            </div>
+            {/* Galeria: capa 3:2 + até 4 fotos aprovadas */}
+            <GaleriaNegocio
+              nome={negocio.nome}
+              categoria={categorias[0]?.nome ?? null}
+              imagens={negocio.imagens}
+            />
 
             <div className="mt-6 flex flex-wrap items-center gap-2">
               {categorias.map((categoria) => (
@@ -633,7 +614,7 @@ export default async function NegocioPage({
               )}
             </section>
 
-            {/* Localização */}
+            {/* Localização + mapa */}
             {negocio.localizacao?.endereco ? (
               <section className="mt-10" aria-labelledby="localizacao">
                 <h2
@@ -642,18 +623,16 @@ export default async function NegocioPage({
                 >
                   Onde fica
                 </h2>
-                <p className="mt-3 flex items-start gap-2 text-sm text-ink-soft">
-                  <MapPin
-                    className="mt-0.5 size-4 shrink-0 text-ink-mute"
-                    aria-hidden="true"
-                  />
-                  <span>
-                    {negocio.localizacao.endereco}
-                    {negocio.localizacao.bairro
-                      ? `, ${negocio.localizacao.bairro}`
-                      : ""}
-                  </span>
-                </p>
+                <MapaEndereco
+                  nome={negocio.nome}
+                  endereco={negocio.localizacao.endereco}
+                  bairro={negocio.localizacao.bairro}
+                  latitude={negocio.localizacao.latitude}
+                  longitude={negocio.localizacao.longitude}
+                  semPontoComercial={Boolean(
+                    negocio.localizacao.semPontoComercial,
+                  )}
+                />
               </section>
             ) : null}
           </div>
@@ -684,6 +663,34 @@ export default async function NegocioPage({
                     <dt className="text-ink-mute">Área de atendimento</dt>
                     <dd className="text-ink">
                       {negocio.localizacao.areaAtendimento}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-ink-mute">Horário de hoje</dt>
+                  <dd className="text-ink">
+                    {sobAgendamento
+                      ? "Somente sob agendamento"
+                      : faixasHoje.length === 0
+                        ? "Fechado hoje"
+                        : faixasHoje
+                            .map(
+                              (faixa) =>
+                                `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
+                            )
+                            .join(" e ")}
+                  </dd>
+                </div>
+                {negocio.localizacao?.endereco ? (
+                  <div>
+                    <dt className="text-ink-mute">Endereço</dt>
+                    <dd className="text-ink">
+                      {comporEndereco({
+                        endereco: negocio.localizacao.endereco,
+                        numero: negocio.localizacao.numero,
+                        bairro: negocio.localizacao.bairro,
+                        cidade: null,
+                      })}
                     </dd>
                   </div>
                 ) : null}

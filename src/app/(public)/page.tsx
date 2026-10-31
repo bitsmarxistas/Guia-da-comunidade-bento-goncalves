@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ComponentType } from "react";
+import { createElement, type ComponentType, type SVGProps } from "react";
 import {
   Building2,
   Coffee,
@@ -11,6 +11,7 @@ import {
   UtensilsCrossed,
   Wrench,
   ArrowRight,
+  ChevronDown,
 } from "lucide-react";
 import { buscarNegocios, listarCategoriasAtivas } from "@/application/catalogo";
 import { Button } from "@/ui/components/button";
@@ -99,7 +100,7 @@ const jsonLd = {
 
 const ICONES_CATEGORIA: Record<
   string,
-  ComponentType<{ className?: string }>
+  ComponentType<SVGProps<SVGSVGElement>>
 > = {
   padarias: Coffee,
   "padarias-e-confeitarias": Coffee,
@@ -121,14 +122,48 @@ function iconeDaCategoria(slug: string) {
   return ICONES_CATEGORIA[slug] ?? Store;
 }
 
+/**
+ * O ícone é criado por `createElement` porque atribuir o componente a uma
+ * variável durante o render é o que a regra react-hooks/static-components
+ * proíbe (o componente mudaria de identidade a cada render).
+ */
+function IconeCategoria({ slug }: { slug: string }) {
+  return createElement(iconeDaCategoria(slug), {
+    className: "size-4 shrink-0 text-brand",
+    "aria-hidden": true,
+  });
+}
+
+function CategoriaAtalho({
+  categoria,
+}: {
+  categoria: { slug: string; nome: string };
+}) {
+  return (
+    <li>
+      <Link
+        href={`/catalogo?categoria=${categoria.slug}`}
+        className="flex h-full min-h-11 items-center gap-2 rounded-[14px] border border-line bg-surface px-3.5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+      >
+        <IconeCategoria slug={categoria.slug} />
+        <span className="truncate">{categoria.nome}</span>
+      </Link>
+    </li>
+  );
+}
+
 export default async function HomePage() {
   const [resultado, categorias] = await Promise.all([
     buscarNegocios({ porPagina: 12, ordenacao: "relevancia" }),
-    listarCategoriasAtivas(),
+    // Todas as ativas: as "ocultas" continuam existindo, mas ficam atrás do
+    // botão "ver todas" — escondidas do primeiro olhar, não removidas.
+    listarCategoriasAtivas({ incluirOcultas: true }),
   ]);
 
   const negocios = resultado.negocios ?? [];
   const categoriasAtivas = categorias ?? [];
+  const categoriasPrincipais = categoriasAtivas.filter((c) => !c.oculta);
+  const categoriasOcultas = categoriasAtivas.filter((c) => c.oculta);
   const achados = negocios.slice(0, 8);
   const destaque = negocios[0];
   const genteDaqui = negocios.slice(0, 3);
@@ -180,7 +215,7 @@ export default async function HomePage() {
 
           {categoriasAtivas.length > 0 ? (
             <ul className="mt-6 flex flex-wrap gap-2">
-              {categoriasAtivas.slice(0, 6).map((categoria) => (
+              {categoriasPrincipais.slice(0, 6).map((categoria) => (
                 <li key={categoria.id}>
                   <Link
                     href={`/catalogo?categoria=${categoria.slug}`}
@@ -212,21 +247,32 @@ export default async function HomePage() {
             </div>
 
             <ul className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              {categoriasAtivas.map((categoria) => {
-                const Icone = iconeDaCategoria(categoria.slug);
-                return (
-                  <li key={categoria.id}>
-                    <Link
-                      href={`/catalogo?categoria=${categoria.slug}`}
-                      className="flex h-full min-h-11 items-center gap-2 rounded-[14px] border border-line bg-surface px-3.5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
-                    >
-                      <Icone className="size-4 shrink-0 text-brand" />
-                      <span className="truncate">{categoria.nome}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+              {categoriasPrincipais.map((categoria) => (
+                <CategoriaAtalho key={categoria.id} categoria={categoria} />
+              ))}
             </ul>
+
+            {categoriasOcultas.length > 0 ? (
+              /*
+               * <details> em vez de estado no cliente: funciona sem JavaScript,
+               * é anunciado como "expandir" por leitores de tela e mantém a
+               * categoria oculta acessível em um clique.
+               */
+              <details className="group mt-4">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-[14px] border border-dashed border-line-strong bg-surface px-3.5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]">
+                  <ChevronDown
+                    className="size-4 transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                  Ver todas as {categoriasAtivas.length} categorias
+                </summary>
+                <ul className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  {categoriasOcultas.map((categoria) => (
+                    <CategoriaAtalho key={categoria.id} categoria={categoria} />
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </div>
         </section>
       ) : null}

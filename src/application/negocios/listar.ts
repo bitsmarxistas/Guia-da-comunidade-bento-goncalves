@@ -71,15 +71,39 @@ export async function listarNegociosAction(params: ListarNegociosParams = {}) {
 }
 
 export async function buscarNegocioPorSlug(slug: string) {
-  return db.query.negocio.findFirst({
+  const n = await db.query.negocio.findFirst({
     where: (n, { eq }) => eq(n.slug, slug),
     with: {
       contatos: true,
       localizacao: true,
       horarios: true,
+      imagens: true,
       categorias: { with: { categoria: true } },
     },
   });
+
+  // Ficha não publicada não existe para o público: antes esta consulta
+  // devolvia qualquer linha e uma ficha oculta/em contestação abria pela URL.
+  if (!n || n.situacaoPublicacao !== "publicado") return null;
+
+  return {
+    ...n,
+    // Só imagem aprovada pela moderação é exibida.
+    imagens: (n.imagens ?? [])
+      .filter((imagem) => imagem.situacao === "aprovada")
+      .sort((a, b) =>
+        a.tipo === "logo"
+          ? -1
+          : b.tipo === "logo"
+            ? 1
+            : +a.criadoEm - +b.criadoEm,
+      )
+      .map((imagem) => ({
+        id: imagem.id,
+        url: imagem.url,
+        tipo: imagem.tipo,
+      })),
+  };
 }
 
 export async function detectarDuplicataNegocio(

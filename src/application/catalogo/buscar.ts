@@ -9,6 +9,7 @@ import {
   localizacao,
   horarioFuncionamento,
   negocioCategoria,
+  imagem,
 } from "@/infrastructure/db/schema";
 import { eq, and, or, desc, asc, sql, inArray, exists } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
@@ -21,6 +22,8 @@ interface BuscarParams {
   pagina?: number;
   porPagina?: number;
   ordenacao?: "relevancia" | "nome_asc" | "nome_desc" | "atualizado_desc";
+  /** Só comércios abertos neste momento (America/Sao_Paulo). */
+  abertoAgora?: boolean;
 }
 
 interface NegocioCompleto {
@@ -38,6 +41,8 @@ interface NegocioCompleto {
     horaFechamento: string;
   }>;
   abertoAgora: "aberto" | "fechado" | "sem_horario";
+  /** Imagens aprovadas pela moderação (logo primeiro, depois fotos). */
+  imagens: Array<{ id: string; url: string; tipo: string }>;
 }
 
 export async function buscarNegocios(
@@ -48,6 +53,7 @@ export async function buscarNegocios(
     pagina?: number;
     porPagina?: number;
     ordenacao?: "relevancia" | "nome_asc" | "nome_desc" | "atualizado_desc";
+    abertoAgora?: boolean;
   } = {},
 ): Promise<{
   negocios: NegocioCompleto[];
@@ -135,6 +141,35 @@ export async function buscarNegocios(
     );
   }
 
+  /*
+   * "Aberto agora" no BANCO, não depois.
+   *
+   * O filtro do catálogo precisa reduzir o resultado (e o total da paginação),
+   * então o horário tem que entrar no WHERE. O fuso é fixo em
+   * America/Sao_Paulo — o guia é de Bento Gonçalves e o servidor da Vercel roda
+   * em UTC, o que deslocaria o dia da semana em 3 horas.
+   */
+  if (params.abertoAgora) {
+    const agoraLocal = sql`(now() AT TIME ZONE 'America/Sao_Paulo')`;
+    const horaLocal = sql`to_char(${agoraLocal}, 'HH24:MI')::time`;
+
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1
+        FROM ${horarioFuncionamento} hf
+        WHERE hf.negocio_id = ${negocio.id}
+          AND hf.dia_semana = EXTRACT(DOW FROM ${agoraLocal})
+          AND (
+            CASE
+              WHEN hf.hora_abertura <= hf.hora_fechamento
+                THEN ${horaLocal} >= hf.hora_abertura AND ${horaLocal} < hf.hora_fechamento
+              ELSE ${horaLocal} >= hf.hora_abertura OR ${horaLocal} < hf.hora_fechamento
+            END
+          )
+      )`,
+    );
+  }
+
   // Build orderBy
   const orderByMap = {
     relevancia: desc(negocio.atualizadoEm),
@@ -179,7 +214,7 @@ export async function buscarNegocios(
 
   const negociosIds = negociosBase.map((n) => n.id);
 
-  const [contatosArr, localizacoesArr, horariosArr, categoriasRel] =
+  const [contatosArr, localizacoesArr, horariosArr, categoriasRel, imagensArr] =
     await Promise.all([
       db
         .select()
@@ -215,6 +250,22 @@ export async function buscarNegocios(
             inArray(negocioCategoria.negocioId, negociosIds),
           ),
         ),
+      // Só imagem aprovada pela moderação aparece no site.
+      db
+        .select({
+          id: imagem.id,
+          negocioId: imagem.negocioId,
+          url: imagem.url,
+          tipo: imagem.tipo,
+        })
+        .from(imagem)
+        .where(
+          and(
+            eq(imagem.situacao, "aprovada"),
+            inArray(imagem.negocioId, negociosIds),
+          ),
+        )
+        .orderBy(asc(imagem.criadoEm)),
     ]);
 
   // Group related data by negocioId
@@ -269,7 +320,18 @@ export async function buscarNegocios(
     });
   }
 
-  const agora = new Date();
+  const imagensByNegocio = new Map<
+    string,
+    Array<{ id: string; url: string; tipo: string }>
+  >();
+  for (const img of imagensArr) {
+    if (!imagensByNegocio.has(img.negocioId))
+      imagensByNegocio.set(img.negocioId, []);
+    imagensByNegocio
+      .get(img.negocioId)!
+      .push({ id: img.id, url: img.url, tipo: img.tipo });
+  }
+
   const negocios: NegocioCompleto[] = negociosBase.map((n) => {
     const horariosN = horariosArr
       .filter((h) => h.negocioId === n.id)
@@ -296,6 +358,7 @@ export async function buscarNegocios(
       localizacao: localizacoesByNegocio.get(n.id) || null,
       horarios: horariosN,
       abertoAgora,
+      imagens: imagensByNegocio.get(n.id) ?? [],
     };
   });
 
@@ -307,102 +370,6 @@ export async function buscarNegocios(
       total: totalResult,
       totalPaginas: Math.ceil(totalResult / (params.porPagina || 20)),
     },
-  };
-}
-
-export async function buscarNegocioPorSlug(slug: string) {
-  const n = await db.query.negocio.findFirst({
-    where: (n, { eq }) => eq(n.slug, slug),
-    with: {
-      contatos: true,
-      localizacao: true,
-      horarios: true,
-      categorias: {
-        with: {
-          categoria: true,
-        },
-      },
-    },
-  });
-
-  if (!n || n.situacaoPublicacao !== "publicado") return null;
-
-  const nTyped = n as {
-    id: string;
-    slug: string;
-    nome: string;
-    descricao: string;
-    situacaoPublicacao: string;
-    contatos: Array<{
-      tipo: string;
-      valor: string;
-      ordem: number;
-      valido: boolean;
-    }>;
-    localizacao: {
-      bairro: string | null;
-      areaAtendimento: string | null;
-    } | null;
-    horarios: Array<{
-      diaSemana: number;
-      horaAbertura: string;
-      horaFechamento: string;
-    }>;
-    categorias: Array<{
-      categoria: { id: string; nome: string; slug: string; ativa: boolean };
-    }>;
-  };
-
-  if (!n || n.situacaoPublicacao !== "publicado") return null;
-
-  const horariosN = (n.horarios ?? []) as Array<{
-    diaSemana: number;
-    horaAbertura: string;
-    horaFechamento: string;
-  }>;
-  const categoriasN = (n.categorias ?? []) as Array<{
-    categoria: { id: string; nome: string; slug: string; ativa: boolean };
-  }>;
-  const contatosN = (n.contatos ?? []) as Array<{
-    valido: boolean;
-    ordem: number;
-  }>;
-  const abertoAgora =
-    horariosN.length > 0
-      ? calcularAbertoAgora(
-          horariosN.map((h) => ({
-            diaSemana: h.diaSemana,
-            horaAbertura: h.horaAbertura,
-            horaFechamento: h.horaFechamento,
-          })),
-          new Date(),
-        )
-      : "sem_horario";
-
-  return {
-    id: n.id,
-    slug: n.slug,
-    nome: n.nome,
-    descricao: n.descricao,
-    situacaoPublicacao: n.situacaoPublicacao,
-    categorias: categoriasN
-      .filter((c) => c.categoria.ativa)
-      .map((c) => ({
-        id: c.categoria.id,
-        nome: c.categoria.nome,
-        slug: c.categoria.slug,
-      })),
-    contatos: contatosN
-      .filter((c) => c.valido)
-      .sort((a, b) => a.ordem - b.ordem),
-    localizacao: n.localizacao
-      ? {
-          bairro: (n.localizacao as any).bairro,
-          areaAtendimento: (n.localizacao as any).areaAtendimento,
-        }
-      : null,
-    horarios: horariosN,
-    abertoAgora,
   };
 }
 

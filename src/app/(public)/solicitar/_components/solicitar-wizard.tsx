@@ -17,6 +17,8 @@ import { Label } from "@/ui/components/label";
 import { Textarea } from "@/ui/components/textarea";
 import { Checkbox } from "@/ui/components/checkbox";
 import { ImageUpload, FileUpload } from "@/ui/components/image-upload";
+import { consultarCepAction } from "@/application/cep/consultar-cep";
+import { formatarCep, normalizarCep } from "@/domain/utils/cep";
 
 /**
  * Wizard de participação (§5.5) em 4 etapas.
@@ -135,6 +137,15 @@ export function SolicitarWizard() {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [bairro, setBairro] = useState("");
+  const [cep, setCep] = useState("");
+  const [numero, setNumero] = useState("");
+  const [semPontoComercial, setSemPontoComercial] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [avisoCep, setAvisoCep] = useState("");
+  const [coordenadas, setCoordenadas] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+  }>({ latitude: null, longitude: null });
   const [endereco, setEndereco] = useState("");
   const [areaAtendimento, setAreaAtendimento] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -250,12 +261,79 @@ export function SolicitarWizard() {
       }
       if (!bairro.trim()) return setErro("Informe o bairro.");
       if (!whatsapp.trim()) return setErro("Informe o WhatsApp do comércio.");
+      if (whatsapp.replace(/\D/g, "").length < 10) {
+        return setErro(
+          "O WhatsApp precisa ter DDD + número (10 ou 11 dígitos). Ex.: (54) 99999-0000.",
+        );
+      }
+      if (telefone.trim() && telefone.replace(/\D/g, "").length < 10) {
+        return setErro(
+          "O telefone precisa ter DDD + número. Deixe em branco se não quiser informar.",
+        );
+      }
+      // Endereço: número é obrigatório, a menos que o comércio não tenha ponto fixo.
+      if (!semPontoComercial) {
+        if (!endereco.trim()) {
+          return setErro(
+            'Informe o endereço (rua) ou marque "sem ponto comercial".',
+          );
+        }
+        if (!numero.trim()) {
+          return setErro(
+            'Informe o número do endereço ou marque "sem ponto comercial".',
+          );
+        }
+      }
     }
 
     if (etapa === 3 && erroHorario) return setErro(erroHorario);
 
     irPara(Math.min(4, etapa + 1));
   };
+
+  /**
+   * Preenche rua/bairro pelo CEP. Nunca sobrescreve o que a pessoa já digitou
+   * sem avisar: se o campo estiver vazio preenche; se estiver diferente, avisa.
+   */
+  const buscarCep = useCallback(async () => {
+    const digitos = normalizarCep(cep);
+    if (digitos.length !== 8) {
+      setAvisoCep("O CEP precisa ter 8 dígitos.");
+      return;
+    }
+
+    setBuscandoCep(true);
+    setAvisoCep("");
+
+    try {
+      const { endereco: achado, error } = await consultarCepAction(digitos);
+
+      if (error || !achado) {
+        setAvisoCep(error ?? "Não encontramos esse CEP. Preencha à mão.");
+        return;
+      }
+
+      if (achado.logradouro) {
+        setEndereco((atual) => (atual.trim() ? atual : achado.logradouro));
+      }
+      if (achado.bairro) {
+        setBairro((atual) => (atual.trim() ? atual : achado.bairro));
+      }
+      setCoordenadas({
+        latitude: achado.latitude,
+        longitude: achado.longitude,
+      });
+      setAvisoCep(
+        achado.cidade && achado.uf
+          ? `${achado.cidade}/${achado.uf} — endereço preenchido.`
+          : "Endereço preenchido pelo CEP.",
+      );
+    } catch {
+      setAvisoCep("Não foi possível consultar o CEP agora. Preencha à mão.");
+    } finally {
+      setBuscandoCep(false);
+    }
+  }, [cep]);
 
   const montarHorarios = useCallback(() => {
     if (horario.dias.length === 0) return [];
@@ -333,7 +411,16 @@ export function SolicitarWizard() {
     }
     formData.append(
       "localizacao",
-      JSON.stringify({ endereco, bairro, areaAtendimento }),
+      JSON.stringify({
+        endereco,
+        bairro,
+        areaAtendimento,
+        cep,
+        numero: semPontoComercial ? "" : numero,
+        semPontoComercial,
+        latitude: coordenadas.latitude,
+        longitude: coordenadas.longitude,
+      }),
     );
     const horarios = montarHorarios();
     if (horarios.length > 0) {
@@ -645,6 +732,80 @@ export function SolicitarWizard() {
                 </div>
               </div>
 
+              {/* CEP primeiro: preenche rua e bairro e evita endereço torto */}
+              <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
+                <div>
+                  <Label htmlFor="cep">CEP</Label>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      id="cep"
+                      value={cep}
+                      onChange={(e) => setCep(formatarCep(e.target.value))}
+                      onBlur={() => {
+                        if (normalizarCep(cep).length === 8) buscarCep();
+                      }}
+                      placeholder="95700-000"
+                      className="h-11"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      aria-describedby="cep-dica"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={buscarCep}
+                      disabled={buscandoCep || normalizarCep(cep).length !== 8}
+                      className="shrink-0"
+                    >
+                      {buscandoCep ? "Buscando…" : "Buscar"}
+                    </Button>
+                  </div>
+                  <p id="cep-dica" className="mt-1 text-xs text-ink-mute">
+                    {avisoCep ||
+                      "Preenchemos rua e bairro automaticamente pelo CEP."}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="endereco">Endereço (rua)</Label>
+                  <Input
+                    id="endereco"
+                    value={endereco}
+                    onChange={(e) => setEndereco(e.target.value)}
+                    placeholder="Rua Marechal Deodoro"
+                    className="mt-2 h-11"
+                    autoComplete="address-line1"
+                    disabled={semPontoComercial}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="numero">Número</Label>
+                  <Input
+                    id="numero"
+                    value={numero}
+                    onChange={(e) => setNumero(e.target.value)}
+                    placeholder="123"
+                    className="mt-2 h-11"
+                    inputMode="numeric"
+                    disabled={semPontoComercial}
+                  />
+                </div>
+                <label className="flex items-start gap-2 self-end pb-2 text-sm text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={semPontoComercial}
+                    onChange={(e) => setSemPontoComercial(e.target.checked)}
+                    className="mt-0.5 size-4 accent-[var(--brand)]"
+                  />
+                  <span>
+                    Sem ponto comercial (atende em casa, na rua ou só por
+                    delivery)
+                  </span>
+                </label>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="bairro">Bairro *</Label>
@@ -667,17 +828,6 @@ export function SolicitarWizard() {
                     className="mt-2 h-11"
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="endereco">Endereço</Label>
-                <Input
-                  id="endereco"
-                  value={endereco}
-                  onChange={(e) => setEndereco(e.target.value)}
-                  placeholder="Rua, número — complemento"
-                  className="mt-2 h-11"
-                />
               </div>
 
               <div>

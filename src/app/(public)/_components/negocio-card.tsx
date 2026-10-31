@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { GlifoWhatsApp } from "@/ui/components/brand/glifos";
+import { ImagemNegocio, primeiraImagem } from "@/ui/components/imagem-negocio";
 
 export interface NegocioCardProps {
   negocio: {
@@ -15,6 +16,7 @@ export interface NegocioCardProps {
       areaAtendimento: string | null;
     } | null;
     abertoAgora: "aberto" | "fechado" | "sem_horario";
+    imagens?: Array<{ id: string; url: string; tipo: string }>;
   };
   /** Primeiro card merece prioridade de carregamento. */
   prioridade?: boolean;
@@ -49,7 +51,7 @@ function formatarTelefone(valor: string): string {
  * bairro e status aberto/fechado com ponto + texto — nunca só cor.
  * O card inteiro é o link; o contato é ação separada.
  */
-export function NegocioCard({ negocio }: NegocioCardProps) {
+export function NegocioCard({ negocio, prioridade = false }: NegocioCardProps) {
   const categoria = negocio.categorias[0];
   const bairro =
     negocio.localizacao?.bairro ?? negocio.localizacao?.areaAtendimento ?? null;
@@ -57,19 +59,38 @@ export function NegocioCard({ negocio }: NegocioCardProps) {
     (contato) => contato.tipo === "whatsapp",
   );
   const status = negocio.abertoAgora ?? "sem_horario";
+  // Foto aprovada quando existir; logo é o segundo melhor; monograma por último.
+  const imagem =
+    primeiraImagem(negocio.imagens, "foto") ??
+    primeiraImagem(negocio.imagens, "logo");
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[14px] border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-line-strong">
+    /*
+     * "relative" é obrigatório: o link do título usa `after:absolute
+     * after:inset-0` para tornar o card inteiro clicável. Sem um ancestral
+     * posicionado, esse ::after se posiciona contra o <body> e cobre a página
+     * toda — era o que interceptava os cliques nos filtros do catálogo.
+     */
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-[14px] border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-line-strong focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus)]">
       <div className="relative aspect-[2/1] overflow-hidden bg-brand-tint">
-        {/* Fallback desenhado: monograma + categoria, nunca caixa vazia */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <span className="font-[family-name:var(--font-fraunces)] text-4xl font-semibold text-brand/70">
-            {iniciais(negocio.nome)}
-          </span>
-        </div>
+        {imagem ? (
+          <ImagemNegocio
+            url={imagem}
+            alt={`Foto de ${negocio.nome}`}
+            sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 92vw"
+            prioridade={prioridade}
+          />
+        ) : (
+          /* Fallback desenhado: monograma + categoria, nunca caixa vazia */
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <span className="font-[family-name:var(--font-fraunces)] text-4xl font-semibold text-brand/70">
+              {iniciais(negocio.nome)}
+            </span>
+          </div>
+        )}
         {categoria ? (
           <span className="absolute left-3 top-3 rounded-full bg-surface/95 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
             {categoria.nome}

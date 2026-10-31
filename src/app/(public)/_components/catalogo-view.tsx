@@ -99,12 +99,20 @@ export async function CatalogoView({
   const bairrosSelecionados = toArray(searchParams.bairro).filter(Boolean);
   const ordenacao = parseOrdenacao(searchParams.ordem);
   const pagina = parsePagina(searchParams.pagina);
+  const somenteAbertos = primeiro(searchParams.aberto) === "1";
 
   const [categorias, bairros] = await Promise.all([
     // No catálogo a categoria oculta continua disponível como filtro.
     listarCategoriasAtivas({ incluirOcultas: true }),
     listarBairrosComNegocios(),
   ]);
+
+  /*
+   * Categorias "ocultas" continuam no filtro, mas recolhidas: a lista principal
+   * fica curta e o visitante expande quando quer — sem perder nenhuma opção.
+   */
+  const categoriasPrincipais = categorias.filter((c) => !c.oculta);
+  const categoriasOcultas = categorias.filter((c) => c.oculta);
 
   const idsPorSlug = new Map(categorias.map((c) => [c.slug, c.id]));
   const nomesPorSlug = new Map(categorias.map((c) => [c.slug, c.nome]));
@@ -119,6 +127,7 @@ export async function CatalogoView({
     pagina,
     porPagina: POR_PAGINA,
     ordenacao,
+    abertoAgora: somenteAbertos,
   });
 
   const { negocios, paginacao } = resultado;
@@ -126,7 +135,8 @@ export async function CatalogoView({
     (termo ? 1 : 0) +
     categoriasSelecionadas.length +
     bairrosSelecionados.length +
-    (ordenacao !== "relevancia" ? 1 : 0);
+    (ordenacao !== "relevancia" ? 1 : 0) +
+    (somenteAbertos ? 1 : 0);
   const temFiltros = filtrosAtivos > 0;
 
   return (
@@ -180,6 +190,16 @@ export async function CatalogoView({
                 {bairro}
               </Chip>
             ))}
+            {somenteAbertos ? (
+              <Chip
+                ativo
+                href={montarUrl(basePath, searchParams, {
+                  remover: ["aberto"],
+                })}
+              >
+                Aberto agora
+              </Chip>
+            ) : null}
             {ordenacao !== "relevancia" ? (
               <Chip
                 ativo
@@ -218,12 +238,27 @@ export async function CatalogoView({
                 />
               </div>
 
+              <label
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-sm font-semibold text-ink"
+                htmlFor="filtro-aberto"
+              >
+                <input
+                  id="filtro-aberto"
+                  type="checkbox"
+                  name="aberto"
+                  value="1"
+                  defaultChecked={somenteAbertos}
+                  className="size-4 accent-[var(--brand)]"
+                />
+                Aberto agora
+              </label>
+
               <fieldset>
                 <legend className="mb-2 text-[13px] font-semibold text-ink">
                   Categoria
                 </legend>
                 <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                  {categorias.map((categoria) => (
+                  {categoriasPrincipais.map((categoria) => (
                     <label
                       key={categoria.id}
                       className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
@@ -240,6 +275,33 @@ export async function CatalogoView({
                       {categoria.nome}
                     </label>
                   ))}
+
+                  {categoriasOcultas.length > 0 ? (
+                    <details className="pt-1">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-[8px] px-1 text-[13px] font-semibold text-brand hover:underline">
+                        + {categoriasOcultas.length} categorias
+                      </summary>
+                      <div className="space-y-1 pt-1">
+                        {categoriasOcultas.map((categoria) => (
+                          <label
+                            key={categoria.id}
+                            className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
+                          >
+                            <input
+                              type="checkbox"
+                              name="categoria"
+                              value={categoria.slug}
+                              defaultChecked={categoriasSelecionadas.includes(
+                                categoria.slug,
+                              )}
+                              className="size-4 accent-[var(--brand)]"
+                            />
+                            {categoria.nome}
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
               </fieldset>
 
@@ -316,8 +378,12 @@ export async function CatalogoView({
 
             {negocios.length > 0 ? (
               <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {negocios.map((negocio) => (
-                  <NegocioCard key={negocio.id} negocio={negocio} />
+                {negocios.map((negocio, indice) => (
+                  <NegocioCard
+                    key={negocio.id}
+                    negocio={negocio}
+                    prioridade={indice === 0}
+                  />
                 ))}
               </div>
             ) : (
