@@ -19,6 +19,7 @@ ela é a fonte da verdade.
 | [04 — Testes](./04-testes.md)                                     | unitários, integração com banco real, como escrever    |
 | [05 — Replicar em outra cidade](./05-replicar-em-outra-cidade.md) | checklist de fork e o que é local a cada cidade        |
 | [06 — Banco e migrations](./06-banco-e-migrations.md)             | schema, regras de migration, drift e como diagnosticar |
+| [07 — Interface](./07-interface.md)                               | design system, shell, telas e como o horário é salvo   |
 
 ## Tour de 30 segundos
 
@@ -47,6 +48,7 @@ usar `domain` e `infrastructure`. `app` só fala com `application`.
 | `pnpm lint`                                                  | ESLint                                   |
 | `pnpm test:unit`                                             | domínio puro (rápido, sem banco)         |
 | `pnpm test:integration`                                      | integração com Postgres real (Docker)    |
+| `pnpm test:e2e`                                              | E2E Playwright contra build de produção  |
 | `pnpm build`                                                 | build de produção                        |
 | `pnpm db:generate` / `db:migrate`                            | cria / aplica migrations                 |
 | `pnpm db:seed:admin`, `db:seed:categorias`, `db:seed:config` | seeds                                    |

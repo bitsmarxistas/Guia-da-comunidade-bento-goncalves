@@ -116,14 +116,14 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
             alt={nome}
             width={96}
             height={96}
-            className="h-24 w-24 rounded-lg border border-border object-cover"
+            className="h-24 w-24 rounded-lg border border-line object-cover"
           />
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-medium text-foreground">{nome}</p>
+              <p className="truncate font-medium text-ink">{nome}</p>
               <Badge variant="secondary">{tipoLabel}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{dataFormatada}</p>
+            <p className="text-sm text-ink-soft">{dataFormatada}</p>
           </div>
         </div>
 
@@ -138,6 +138,7 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
           <Button
             type="button"
             size="sm"
+            className="h-10"
             onClick={() => executarModeracao("aprovar")}
             disabled={carregando}
           >
@@ -168,6 +169,7 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
                   type="button"
                   size="sm"
                   variant="destructive"
+                  className="h-10"
                   onClick={() => executarModeracao("rejeitar")}
                   disabled={carregando}
                 >
@@ -187,6 +189,7 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="h-10"
                   onClick={() => {
                     setRejeitando(false);
                     setErro(null);
@@ -203,6 +206,7 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
               type="button"
               size="sm"
               variant="outline"
+              className="h-10"
               onClick={() => setRejeitando(true)}
               disabled={carregando}
             >

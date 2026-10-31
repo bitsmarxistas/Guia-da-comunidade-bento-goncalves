@@ -65,9 +65,12 @@ export function AcaoForm({ solicitacaoId, situacao }: AcaoFormProps) {
       )}
 
       {state.success && (
-        <Alert variant="default" className="border-green-200 bg-green-50">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-800">Sucesso</AlertTitle>
+        <Alert
+          variant="default"
+          className="border-positive/30 bg-positive-tint"
+        >
+          <CheckCircle className="h-4 w-4 text-positive" />
+          <AlertTitle className="text-positive">Sucesso</AlertTitle>
           <AlertDescription>
             <div>
               Solicitação {state.situacao} com sucesso!

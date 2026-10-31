@@ -1,50 +1,113 @@
-// src/app/(public)/negocio/[slug]/page.tsx
-import { Metadata } from "next";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { buscarNegocioPorSlug } from "@/application/negocios/listar";
-import { Button } from "@/ui/components/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/ui/components/card";
-import { Badge } from "@/ui/components/badge";
-import { ShareButton } from "@/ui/components/share-button";
-import {
-  MapPin,
-  Phone,
-  Mail,
-  Clock,
-  MapPin as MapPinIcon,
   Building2,
-  MessageSquare,
-  Share2,
-  Copy,
-  Check,
+  CalendarClock,
+  Clock,
+  ExternalLink,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
+  ShieldCheck,
   Tag,
 } from "lucide-react";
-import Link from "next/link";
+import { buscarNegocioPorSlug } from "@/application/negocios/listar";
+import { Button } from "@/ui/components/button";
+import { ShareButton } from "@/ui/components/share-button";
+import { GlifoInstagram, GlifoWhatsApp } from "@/ui/components/brand/glifos";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
-// WhatsApp Icon Component
-function WhatsAppIcon() {
-  return (
-    <svg
-      className="h-4 w-4"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M20.52 3.48a11.914 11.914 0 0 0-7.26-3.36 11.9 11.9 0 0 0-7.12 3.03A11.94 11.94 0 0 0 1.56 11.67c0 2.57.94 4.95 2.58 6.87l-1.92 7.35c-.14.55.15 1.1.6 1.35.38.17.81.09 1.13-.14l3.44-2.48a.5.5 0 0 1 .64-.02c2.36 1.74 5.24 2.79 8.15 2.79 4.02 0 7.57-1.93 9.9-4.93a11.87 11.87 0 0 0 3.18-8.67 11.92 11.92 0 0 0-3.36-7.47 11.95 11.95 0 0 0-7.31-3.28 11.97 11.97 0 0 0-7.32 3.03A11.97 11.97 0 0 0 12 22.56c0 6.63-5.37 12-12 12S0 18.63 0 12 5.37 0 12 0s12 5.37 12 12a11.96 11.96 0 0 1-.14 1.58 11.85 11.85 0 0 1-1.44.7c-1.84.18-3.65-.36-5.1-1.44-.87-.61-1.6-1.43-2.2-2.38-.52-.82-.78-1.74-.74-2.73.02-.47.11-.93.29-1.38.3-.74.88-1.39 1.58-1.92a9.66 9.66 0 0 1 2.52-.92c.95 0 1.9.15 2.81.43.45.14.9.23 1.34.28l.32.04c.27.02.54-.04.77-.18.27-.17.48-.4.63-.68.13-.24.2-.5.27-.8.03-.08.05-.17.06-.26.01-.08.01-.16-.02-.24-.01-.17 0-.35-.01-.52-.02-.69-.01-1.37-.03-1.98-.04l-.35-.02a53.37 53.37 0 0 1-2.1-.33c-.25-.05-.5-.09-.73-.14a.5.5 0 0 1-.17-.81c.31-1.03.65-2.04 1.04-3.06.2-.47.32-.94.41-1.42.1-.47.15-.93.19-1.4.07-.81.1-1.61.1-2.43 0-.92-.04-1.84-.12-2.72-.08-.7-.17-1.37-.32-2.01-.18-.75-.4-1.47-.71-2.15-.36-.79-.8-1.5-1.29-2.1-.62-.73-1.32-1.33-2.11-1.77-.3-.18-.59-.36-.88-.53-.7-.44-1.24-1.03-1.64-1.71-.23-.38-.43-.77-.58-1.18-.15-.4-.26-.8-.33-1.2-.07-.38-.1-.76-.12-1.14-.02-.4-.02-.8-.01-1.2-.01-.4-.01-.8-.01-1.2 0-.4.01-.8.01-1.2 0-.4.01-.8.01-1.2 0-.4.01-.8.01-1.2 0-.4.01-.8.01-1.2 0-.39.01-.78.01-1.17.01-.38 0-.77-.01-1.15-.01-.36-.01-.72-.01-1.07-.02-.33-.01-.65-.01-.96-.01-.3-.01-.59-.01-.89 0-.28 0-.55 0-.83.01-1.16.02-1.52.03-1.88.05-2.24.08-2.6.13-2.96.19-3.32.27-3.68.37-3.81.41-3.84.41-3.85.41h-.16c-3.34-.02-6.38-.1-9.38-.1-2.78 0-5.44.06-7.9.18-.82.04-1.62.11-2.4.22-.96.13-1.87.34-2.72.61-1.14.37-2.2.87-3.13 1.26-.4.17-.8.36-1.17.57-1.38.79-1.22.94-1.77 1.43-1.85 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18 1.85-1.18" />
-    </svg>
-  );
+const DIAS = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
+
+const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+const SOB_AGENDAMENTO = "somente sob agendamento";
+
+const urlSite = process.env.NEXT_PUBLIC_SITE_URL ?? "https://guiabg.com.br";
+
+function horaCurta(valor: string): string {
+  return valor.slice(0, 5);
 }
 
-async function getNegocioData(slug: string) {
-  return buscarNegocioPorSlug(slug);
+/** "Agora" no fuso de São Paulo, independente do fuso do servidor. */
+function agoraEmSaoPaulo() {
+  const formato = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const partes = formato.formatToParts(new Date());
+  const mapa: Record<string, string> = {};
+  for (const parte of partes) mapa[parte.type] = parte.value;
+  const mapaDia: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return {
+    dia: mapaDia[mapa.weekday ?? "Sun"] ?? 0,
+    minutos: Number(mapa.hour ?? "0") * 60 + Number(mapa.minute ?? "0"),
+  };
+}
+
+function emMinutos(hora: string): number {
+  const [h, m] = hora.split(":");
+  return Number(h) * 60 + Number(m ?? 0);
+}
+
+function iniciais(nome: string): string {
+  return nome
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join("")
+    .toUpperCase();
+}
+
+type NegocioComRelacoes = NonNullable<
+  Awaited<ReturnType<typeof buscarNegocioPorSlug>>
+>;
+
+function contatosPorTipo(negocio: NegocioComRelacoes, tipo: string) {
+  return negocio.contatos
+    .filter((contato) => contato.tipo === tipo)
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
+function linkWhatsApp(valor: string, nome: string): string {
+  const digitos = valor.replace(/\D/g, "");
+  const mensagem = encodeURIComponent(
+    `Olá! Encontrei ${nome} no GuiaBG e quero saber mais.`,
+  );
+  return `https://wa.me/55${digitos}?text=${mensagem}`;
+}
+
+function formatarTelefone(valor: string): string {
+  const digitos = valor.replace(/\D/g, "");
+  if (digitos.length === 11)
+    return digitos.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  if (digitos.length === 10)
+    return digitos.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  return valor;
 }
 
 export async function generateMetadata({
@@ -52,343 +115,34 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const slug = resolvedParams?.slug;
-
-  if (!slug) {
-    return {
-      title: "Negócio - GuiaBG",
-    };
-  }
-
-  const negocio = await getNegocioData(slug);
+  const { slug } = await params;
+  const negocio = await buscarNegocioPorSlug(slug);
 
   if (!negocio) {
-    return {
-      title: "Negócio não encontrado - GuiaBG",
-    };
+    return { title: "Comércio não encontrado" };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://guiabg.com.br";
-  const pageUrl = `${siteUrl}/negocio/${slug}`;
+  const url = `${urlSite}/negocio/${slug}`;
+  const descricao = negocio.descricao.slice(0, 160);
 
   return {
-    title: `${negocio.nome} - GuiaBG`,
-    description: negocio.descricao.slice(0, 160),
+    title: negocio.nome,
+    description: descricao,
+    alternates: { canonical: `/negocio/${slug}` },
     openGraph: {
       title: negocio.nome,
-      description: negocio.descricao.slice(0, 160),
+      description: descricao,
       type: "website",
-      url: pageUrl,
+      url,
       siteName: "GuiaBG",
       locale: "pt_BR",
     },
     twitter: {
       card: "summary_large_image",
       title: negocio.nome,
-      description: negocio.descricao.slice(0, 160),
-    },
-    other: {
-      "og:url": pageUrl,
+      description: descricao,
     },
   };
-}
-
-async function NegocioPageContent({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const negocio = await getNegocioData(slug);
-
-  if (!negocio) {
-    notFound();
-  }
-
-  const primeiroContato = negocio.contatos[0];
-  const telefoneFormatado = primeiroContato
-    ? primeiroContato.valor.replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
-    : null;
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://guiabg.com.br";
-  const pageUrl = `${siteUrl}/negocio/${slug}`;
-
-  const DIAS_SEMANA = [
-    "Domingo",
-    "Segunda-feira",
-    "Terça-feira",
-    "Quarta-feira",
-    "Quinta-feira",
-    "Sexta-feira",
-    "Sábado",
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-foreground">GuiaBG</span>
-            </Link>
-            <nav className="hidden md:flex items-center gap-6">
-              <Link
-                href="/catalogo"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Catálogo
-              </Link>
-              <Link
-                href="/solicitar"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cadastrar
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <Link
-            href="/catalogo"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-          >
-            <span aria-hidden="true">←</span> Voltar ao catálogo
-          </Link>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  {negocio.categorias
-                    .map((cat: any) => cat.categoria?.nome || cat.nome)
-                    .join(", ") || "Sem categoria"}
-                </span>
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mt-2">
-                  {negocio.nome}
-                </h1>
-              </div>
-              <ShareButton
-                url={pageUrl}
-                title={negocio.nome}
-                text={negocio.descricao}
-                variant="outline"
-                size="default"
-              />
-            </div>
-
-            <div className="prose prose-lg dark:prose-invert max-w-none">
-              <p className="text-lg text-muted-foreground">
-                {negocio.descricao}
-              </p>
-            </div>
-
-            {/* Contatos */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-5 w-5" />
-                  Contatos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {negocio.contatos.map((contato, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
-                  >
-                    <span className="font-medium capitalize text-sm text-muted-foreground min-w-[100px]">
-                      {contato.tipo}:
-                    </span>
-                    {contato.tipo === "whatsapp" && telefoneFormatado ? (
-                      <a
-                        href={`https://wa.me/55${telefoneFormatado.replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-primary hover:underline"
-                      >
-                        <span className="font-medium">{telefoneFormatado}</span>
-                        <span className="text-green-600">WhatsApp</span>
-                      </a>
-                    ) : (
-                      <span className="font-medium">{contato.valor}</span>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Localização */}
-            {negocio.localizacao && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPinIcon className="h-5 w-5" />
-                    Localização
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {negocio.localizacao.endereco && (
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <p>{negocio.localizacao.endereco}</p>
-                    </div>
-                  )}
-                  {negocio.localizacao.bairro && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPinIcon className="h-4 w-4 flex-shrink-0" />
-                      <span>Bairro: {negocio.localizacao.bairro}</span>
-                    </div>
-                  )}
-                  {negocio.localizacao.areaAtendimento && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPinIcon className="h-4 w-4 flex-shrink-0" />
-                      <span>
-                        Área de atendimento:{" "}
-                        {negocio.localizacao.areaAtendimento}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Horários */}
-            {negocio.horarios && negocio.horarios.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Horários de Funcionamento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {negocio.horarios.map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-2 border-b last:border-0"
-                      >
-                        <span className="font-medium capitalize">
-                          {DIAS_SEMANA[h.diaSemana]}
-                        </span>
-                        <div className="flex items-center gap-4">
-                          <span>
-                            {h.horaAbertura} - {h.horaFechamento}
-                          </span>
-                          {h.observacao && (
-                            <span className="text-sm text-muted-foreground">
-                              ({h.observacao})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Categorias */}
-            {negocio.categorias.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-5 w-5" />
-                    Categorias
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {negocio.categorias.map((cat: any) => (
-                      <Badge
-                        key={cat.categoria?.id || cat.id}
-                        variant="secondary"
-                        className="text-sm"
-                      >
-                        {cat.categoria?.nome || cat.nome}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Botão solicitar correção */}
-            <div className="pt-4">
-              <Link
-                href={`/solicitar?negocio=${negocio.id}`}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Solicitar correção ou atualização
-              </Link>
-            </div>
-          </div>
-
-          <aside className="lg:col-span-1 space-y-6">
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Informações
-                </CardTitle>
-                <CardDescription>Detalhes do negócio</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {negocio.localizacao?.bairro && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPinIcon className="h-4 w-4 flex-shrink-0" />
-                    <span>{negocio.localizacao.bairro}</span>
-                  </div>
-                )}
-
-                {negocio.categorias.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                      Categorias
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {negocio.categorias.map((cat: any) => (
-                        <Badge
-                          key={cat.categoria?.id || cat.id}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {cat.categoria?.nome || cat.nome}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="border-t pt-4">
-                  <Link
-                    href={`/solicitar?negocio=${negocio.id}`}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Solicitar correção
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
-        </div>
-      </main>
-
-      <footer className="border-t border-border py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          <p>© 2025 GuiaBG. Diretório Comunitário de Bento Gonçalves.</p>
-        </div>
-      </footer>
-    </div>
-  );
 }
 
 export default async function NegocioPage({
@@ -397,11 +151,475 @@ export default async function NegocioPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const negocio = await getNegocioData(slug);
+  const negocio = await buscarNegocioPorSlug(slug);
 
-  if (!negocio) {
-    notFound();
+  if (!negocio) notFound();
+
+  const url = `${urlSite}/negocio/${slug}`;
+  const whatsapps = contatosPorTipo(negocio, "whatsapp");
+  const telefones = contatosPorTipo(negocio, "telefone");
+  const emails = contatosPorTipo(negocio, "email");
+  const instagrams = contatosPorTipo(negocio, "instagram");
+  const sites = contatosPorTipo(negocio, "site");
+
+  const porDia = new Map<number, typeof negocio.horarios>();
+  for (const horario of negocio.horarios) {
+    const lista = porDia.get(horario.diaSemana) ?? [];
+    lista.push(horario);
+    porDia.set(horario.diaSemana, lista);
+  }
+  for (const lista of porDia.values()) {
+    lista.sort((a, b) => a.horaAbertura.localeCompare(b.horaAbertura));
   }
 
-  return <NegocioPageContent params={Promise.resolve({ slug })} />;
+  const sobAgendamento =
+    negocio.horarios.length > 0 &&
+    negocio.horarios.every((horario) =>
+      (horario.observacao ?? "").toLowerCase().includes(SOB_AGENDAMENTO),
+    );
+
+  const { dia: diaAtual, minutos: minutosAgora } = agoraEmSaoPaulo();
+  const faixasHoje = porDia.get(diaAtual) ?? [];
+  const abertoAgora = sobAgendamento
+    ? null
+    : faixasHoje.some(
+        (faixa) =>
+          minutosAgora >= emMinutos(faixa.horaAbertura) &&
+          minutosAgora < emMinutos(faixa.horaFechamento),
+      );
+
+  const categorias = negocio.categorias
+    .map((vinculo) => vinculo.categoria)
+    .filter(Boolean);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: negocio.nome,
+    description: negocio.descricao,
+    url,
+    ...(telefones[0]
+      ? { telephone: formatarTelefone(telefones[0].valor) }
+      : {}),
+    ...(emails[0] ? { email: emails[0].valor } : {}),
+    ...(negocio.localizacao
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: negocio.localizacao.endereco ?? undefined,
+            addressLocality: "Bento Gonçalves",
+            addressRegion: "RS",
+            addressCountry: "BR",
+            ...(negocio.localizacao.bairro
+              ? { addressNeighborhood: negocio.localizacao.bairro }
+              : {}),
+          },
+        }
+      : {}),
+    ...(negocio.horarios.length > 0 && !sobAgendamento
+      ? {
+          openingHoursSpecification: negocio.horarios.map((horario) => ({
+            "@type": "OpeningHoursSpecification",
+            dayOfWeek: `https://schema.org/${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][horario.diaSemana]}`,
+            opens: horaCurta(horario.horaAbertura),
+            closes: horaCurta(horario.horaFechamento),
+          })),
+        }
+      : {}),
+    ...(instagrams[0]
+      ? {
+          sameAs: [
+            `https://instagram.com/${instagrams[0].valor.replace(/^@/, "")}`,
+          ],
+        }
+      : {}),
+  };
+
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Início", item: urlSite },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Catálogo",
+        item: `${urlSite}/catalogo`,
+      },
+      { "@type": "ListItem", position: 3, name: negocio.nome, item: url },
+    ],
+  };
+
+  return (
+    <div className="bg-canvas">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
+
+      <div className="container-page py-8 md:py-10">
+        {/* Breadcrumb */}
+        <nav aria-label="Você está aqui" className="text-sm text-ink-mute">
+          <Link href="/" className="hover:text-brand">
+            Início
+          </Link>
+          <span aria-hidden="true" className="mx-2">
+            /
+          </span>
+          <Link href="/catalogo" className="hover:text-brand">
+            Catálogo
+          </Link>
+          <span aria-hidden="true" className="mx-2">
+            /
+          </span>
+          <span className="text-ink">{negocio.nome}</span>
+        </nav>
+
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+          <div>
+            {/* Galeria: capa 3:2 + fallback desenhado */}
+            <div className="relative aspect-[3/2] overflow-hidden rounded-[22px] border border-line bg-brand-tint">
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-brand"
+              >
+                <Building2 className="size-12" />
+                <span className="font-[family-name:var(--font-fraunces)] text-4xl font-semibold">
+                  {iniciais(negocio.nome)}
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-strong">
+                  {categorias[0]?.nome ?? "Comércio local"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              {categorias.map((categoria) => (
+                <Link
+                  key={categoria.id}
+                  href={`/catalogo?categoria=${categoria.slug}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
+                >
+                  <Tag className="size-3.5" aria-hidden="true" />
+                  {categoria.nome}
+                </Link>
+              ))}
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-tint px-3 text-[13px] font-semibold text-brand-strong">
+                <ShieldCheck className="size-3.5" aria-hidden="true" />
+                Do guia
+              </span>
+            </div>
+
+            <h1 className="h1-editorial mt-4">{negocio.nome}</h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-soft">
+              {negocio.localizacao?.bairro ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4" aria-hidden="true" />
+                  {negocio.localizacao.bairro}
+                </span>
+              ) : null}
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className={
+                    abertoAgora === null
+                      ? "size-2 rounded-full border border-ink-mute"
+                      : abertoAgora
+                        ? "size-2 rounded-full bg-positive"
+                        : "size-2 rounded-full bg-ink-mute"
+                  }
+                />
+                {sobAgendamento
+                  ? "Somente sob agendamento"
+                  : abertoAgora === null
+                    ? "Horário não informado"
+                    : abertoAgora
+                      ? "Aberto agora"
+                      : "Fechado agora"}
+              </span>
+            </div>
+
+            <p className="leitura mt-6 text-lg leading-relaxed text-ink-soft">
+              {negocio.descricao}
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              {whatsapps[0] ? (
+                <Button asChild size="lg">
+                  <a
+                    href={linkWhatsApp(whatsapps[0].valor, negocio.nome)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <GlifoWhatsApp className="size-5" />
+                    Falar no WhatsApp
+                  </a>
+                </Button>
+              ) : null}
+              <ShareButton
+                url={url}
+                title={negocio.nome}
+                text={negocio.descricao}
+              />
+            </div>
+
+            {/* Contatos — nada de campo vazio */}
+            {telefones.length +
+              emails.length +
+              instagrams.length +
+              sites.length >
+            0 ? (
+              <section className="mt-10" aria-labelledby="contatos">
+                <h2
+                  id="contatos"
+                  className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
+                >
+                  Contatos
+                </h2>
+                <ul className="mt-3 divide-y divide-line border-y border-line">
+                  {telefones.map((contato) => (
+                    <li
+                      key={contato.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <Phone
+                        className="size-4 text-ink-mute"
+                        aria-hidden="true"
+                      />
+                      <a
+                        href={`tel:${contato.valor.replace(/\D/g, "")}`}
+                        className="text-sm font-medium text-ink hover:text-brand"
+                      >
+                        {formatarTelefone(contato.valor)}
+                      </a>
+                    </li>
+                  ))}
+                  {emails.map((contato) => (
+                    <li
+                      key={contato.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <Mail
+                        className="size-4 text-ink-mute"
+                        aria-hidden="true"
+                      />
+                      <a
+                        href={`mailto:${contato.valor}`}
+                        className="text-sm font-medium text-ink hover:text-brand"
+                      >
+                        {contato.valor}
+                      </a>
+                    </li>
+                  ))}
+                  {instagrams.map((contato) => (
+                    <li
+                      key={contato.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <GlifoInstagram className="size-4 text-ink-mute" />
+                      <a
+                        href={`https://instagram.com/${contato.valor.replace(/^@/, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-ink hover:text-brand"
+                      >
+                        @{contato.valor.replace(/^@/, "")}
+                      </a>
+                    </li>
+                  ))}
+                  {sites.map((contato) => (
+                    <li
+                      key={contato.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <ExternalLink
+                        className="size-4 text-ink-mute"
+                        aria-hidden="true"
+                      />
+                      <a
+                        href={
+                          contato.valor.startsWith("http")
+                            ? contato.valor
+                            : `https://${contato.valor}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-ink hover:text-brand"
+                      >
+                        {contato.valor.replace(/^https?:\/\//, "")}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-ink-mute">
+                  O WhatsApp é o contato do comércio. A equipe do guia não
+                  responde por lá.
+                </p>
+              </section>
+            ) : null}
+
+            {/* Horários */}
+            <section className="mt-10" aria-labelledby="horarios">
+              <h2
+                id="horarios"
+                className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
+              >
+                Horários
+              </h2>
+
+              {negocio.horarios.length === 0 ? (
+                <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
+                  <Clock className="size-4 text-ink-mute" aria-hidden="true" />
+                  Horário não informado.
+                </p>
+              ) : sobAgendamento ? (
+                <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
+                  <CalendarClock
+                    className="size-4 text-ink-mute"
+                    aria-hidden="true"
+                  />
+                  Atendimento somente sob agendamento.
+                </p>
+              ) : (
+                <table className="mt-3 w-full border-collapse text-sm">
+                  <caption className="sr-only">
+                    Horário de funcionamento de {negocio.nome}
+                  </caption>
+                  <tbody>
+                    {DIAS.map((dia, indice) => {
+                      const faixas = porDia.get(indice) ?? [];
+                      const ehHoje = indice === diaAtual;
+                      return (
+                        <tr
+                          key={dia}
+                          className={
+                            ehHoje
+                              ? "border-b border-line bg-brand-tint/60"
+                              : "border-b border-line"
+                          }
+                        >
+                          <th
+                            scope="row"
+                            className="py-2.5 pr-4 text-left font-medium text-ink"
+                          >
+                            <span className="sm:hidden">
+                              {DIAS_CURTOS[indice]}
+                            </span>
+                            <span className="hidden sm:inline">{dia}</span>
+                            {ehHoje ? (
+                              <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-on-brand">
+                                hoje
+                              </span>
+                            ) : null}
+                          </th>
+                          <td className="py-2.5 text-right text-ink-soft tabular">
+                            {faixas.length === 0 ? (
+                              <span className="text-ink-mute">Fechado</span>
+                            ) : (
+                              faixas
+                                .map(
+                                  (faixa) =>
+                                    `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
+                                )
+                                .join(" e ")
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            {/* Localização */}
+            {negocio.localizacao?.endereco ? (
+              <section className="mt-10" aria-labelledby="localizacao">
+                <h2
+                  id="localizacao"
+                  className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
+                >
+                  Onde fica
+                </h2>
+                <p className="mt-3 flex items-start gap-2 text-sm text-ink-soft">
+                  <MapPin
+                    className="mt-0.5 size-4 shrink-0 text-ink-mute"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {negocio.localizacao.endereco}
+                    {negocio.localizacao.bairro
+                      ? `, ${negocio.localizacao.bairro}`
+                      : ""}
+                  </span>
+                </p>
+              </section>
+            ) : null}
+          </div>
+
+          {/* Coluna lateral */}
+          <aside className="space-y-4 lg:sticky lg:top-24">
+            <div className="rounded-[22px] border border-line bg-surface p-5">
+              <h2 className="font-[family-name:var(--font-fraunces)] text-lg font-semibold">
+                Informações
+              </h2>
+              <dl className="mt-3 space-y-3 text-sm">
+                {categorias.length > 0 ? (
+                  <div>
+                    <dt className="text-ink-mute">Categoria</dt>
+                    <dd className="text-ink">
+                      {categorias.map((categoria) => categoria.nome).join(", ")}
+                    </dd>
+                  </div>
+                ) : null}
+                {negocio.localizacao?.bairro ? (
+                  <div>
+                    <dt className="text-ink-mute">Bairro</dt>
+                    <dd className="text-ink">{negocio.localizacao.bairro}</dd>
+                  </div>
+                ) : null}
+                {negocio.localizacao?.areaAtendimento ? (
+                  <div>
+                    <dt className="text-ink-mute">Área de atendimento</dt>
+                    <dd className="text-ink">
+                      {negocio.localizacao.areaAtendimento}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-ink-mute">Situação</dt>
+                  <dd className="text-ink">
+                    {sobAgendamento
+                      ? "Somente sob agendamento"
+                      : abertoAgora === null
+                        ? "Horário não informado"
+                        : abertoAgora
+                          ? "Aberto agora"
+                          : "Fechado agora"}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-5 border-t border-line pt-4">
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/solicitar?negocio=${negocio.id}`}>
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Pedir correção
+                  </Link>
+                </Button>
+                <p className="mt-2 text-xs text-ink-mute">
+                  A resposta da análise chega por e-mail, em até 24 h.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
 }

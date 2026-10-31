@@ -1,54 +1,53 @@
-// src/app/(admin)/votacoes/page.tsx
+// src/app/(admin)/admin/votacoes/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
-import { Button } from "@/ui/components/button";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
 export default async function VotacoesPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Votações</h1>
-          <p className="text-gray-600">
-            Gerenciar votações ativas e finalizadas
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Votações"
+        description="Acompanhar votações ativas e finalizadas. Área restrita à administração."
+        restrito
+      />
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Votações Ativas</CardTitle>
+            <CardTitle>Votações ativas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Em Apuração</CardTitle>
+            <CardTitle>Em apuração</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Finalizadas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Votações Recentes</h2>
+      <section aria-labelledby="votacoes-recentes" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="votacoes-recentes" className="text-lg font-semibold text-ink">
+            Votações recentes
+          </h2>
         </div>
-        <div className="border rounded-lg p-4 bg-gray-50 text-center text-gray-500">
+        <div className="rounded-xl border border-line bg-surface-2 p-6 text-center text-sm text-ink-mute">
           Nenhuma votação encontrada
         </div>
-      </div>
+      </section>
     </div>
   );
 }

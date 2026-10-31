@@ -13,7 +13,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/ui/components/card";
@@ -25,24 +24,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/components/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/tabs";
 import {
   AlertCircle,
-  CheckCircle,
-  Mail,
-  Phone,
-  MapPin,
-  Clock,
-  Building2,
-  FileText,
-  MessageSquare,
+  ChevronLeft,
   Gavel,
-  Vote,
-  Users,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Phone,
   Plus,
   Send,
-  Check,
-  X,
-  AlertTriangle,
+  Vote,
 } from "lucide-react";
 import Link from "next/link";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import { revalidatePath } from "next/cache";
 import { AcaoForm } from "./_components/acao-form";
 
@@ -95,19 +88,22 @@ const CONTESTACAO_TIPO_OPTIONS = [
   { value: "manifesta", label: "Manifestação (apenas registro)" },
 ] as const;
 
+const SITUACAO_CLASSES: Record<string, string> = {
+  recebida: "border-brand/20 bg-brand-tint text-brand-strong",
+  em_fila_contestacao: "border-warning/30 bg-warning-tint text-warning",
+  aprovada: "border-positive/30 bg-positive-tint text-positive",
+  reprovada: "border-critical/30 bg-critical-tint text-critical",
+  incompleta: "border-line bg-surface-2 text-ink-soft",
+};
+
 function SituacaoBadge({ situacao }: { situacao: string }) {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
-    recebida: "default",
-    em_fila_contestacao: "secondary",
-    aprovada: "default",
-    reprovada: "destructive",
-    incompleta: "outline",
-  };
   return (
-    <Badge variant={variants[situacao] || "default"}>
+    <Badge
+      variant="outline"
+      className={
+        SITUACAO_CLASSES[situacao] ?? "border-line bg-surface-2 text-ink-soft"
+      }
+    >
       {SITUACAO_LABELS[situacao] || situacao}
     </Badge>
   );
@@ -133,7 +129,7 @@ export default async function SolicitacaoDetailPage({
         </Alert>
         <Link
           href="/admin/solicitacoes"
-          className="text-blue-600 hover:underline mt-4 inline-block"
+          className="mt-4 inline-flex min-h-10 items-center text-sm font-medium text-brand transition-colors hover:text-brand-strong hover:underline"
         >
           Voltar
         </Link>
@@ -146,30 +142,27 @@ export default async function SolicitacaoDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link
-            href="/admin/solicitacoes"
-            className="text-blue-600 hover:underline text-sm mb-2 inline-block"
-          >
-            ← Voltar às solicitações
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {dados.nome || "Solicitação sem nome"}
-          </h1>
-          <p className="text-gray-600">
-            {TIPO_LABELS[sol.tipo] || sol.tipo} •{" "}
-            {SITUACAO_LABELS[sol.situacao] || sol.situacao}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="space-y-3">
+        <Link
+          href="/admin/solicitacoes"
+          className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-ink-soft transition-colors hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          Voltar às solicitações
+        </Link>
+        <AdminPageHeader
+          title={dados.nome || "Solicitação sem nome"}
+          description={`${TIPO_LABELS[sol.tipo] || sol.tipo} • ${
+            SITUACAO_LABELS[sol.situacao] || sol.situacao
+          }`}
+        >
           <SituacaoBadge situacao={sol.situacao} />
-        </div>
+        </AdminPageHeader>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Dados do Negócio</CardTitle>
               <CardDescription>
@@ -201,7 +194,7 @@ export default async function SolicitacaoDetailPage({
                         </span>
                         <span>{c.valor}</span>
                         {c.ordem !== undefined && (
-                          <span className="text-gray-400">
+                          <span className="text-ink-mute">
                             (ordem: {c.ordem})
                           </span>
                         )}
@@ -217,19 +210,19 @@ export default async function SolicitacaoDetailPage({
                   <div className="space-y-1 text-sm">
                     {dados.localizacao.endereco && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <MapPin className="h-4 w-4 text-ink-mute" />
                         <span>{dados.localizacao.endereco}</span>
                       </div>
                     )}
                     {dados.localizacao.bairro && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <MapPin className="h-4 w-4 text-ink-mute" />
                         <span>Bairro: {dados.localizacao.bairro}</span>
                       </div>
                     )}
                     {dados.localizacao.areaAtendimento && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <MapPin className="h-4 w-4 text-ink-mute" />
                         <span>Área: {dados.localizacao.areaAtendimento}</span>
                       </div>
                     )}
@@ -250,7 +243,7 @@ export default async function SolicitacaoDetailPage({
                           {h.horaAbertura} - {h.horaFechamento}
                         </span>
                         {h.observacao && (
-                          <span className="text-gray-500">
+                          <span className="text-ink-mute">
                             ({h.observacao})
                           </span>
                         )}
@@ -278,7 +271,7 @@ export default async function SolicitacaoDetailPage({
               {dados.sugestaoCategoria && (
                 <div className="space-y-2">
                   <Label>Sugestão de Nova Categoria</Label>
-                  <p className="text-sm text-blue-600">
+                  <p className="text-sm text-brand">
                     {dados.sugestaoCategoria}
                   </p>
                 </div>
@@ -286,7 +279,7 @@ export default async function SolicitacaoDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Solicitante</CardTitle>
               <CardDescription>
@@ -303,20 +296,20 @@ export default async function SolicitacaoDetailPage({
               <div className="space-y-2">
                 <Label>E-mail</Label>
                 <p className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-400" />
+                  <Mail className="h-4 w-4 text-ink-mute" />
                   <span>{sol.solicitante?.email || "Não informado"}</span>
                 </p>
               </div>
               <div className="space-y-2">
                 <Label>Telefone</Label>
                 <p className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
+                  <Phone className="h-4 w-4 text-ink-mute" />
                   <span>{sol.solicitante?.telefone || "Não informado"}</span>
                 </p>
               </div>
               <div className="space-y-2">
                 <Label>Declaração de Vínculo</Label>
-                <p className="whitespace-pre-wrap text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                <p className="whitespace-pre-wrap text-sm text-ink-soft rounded-lg bg-surface-2 p-3">
                   {sol.declaracaoVinculo}
                 </p>
               </div>
@@ -324,7 +317,7 @@ export default async function SolicitacaoDetailPage({
           </Card>
 
           {sol.sugestaoCategoria && sol.sugestaoCategoria.length > 0 && (
-            <Card>
+            <Card size="sm">
               <CardHeader>
                 <CardTitle>Sugestão de Categoria</CardTitle>
                 <CardDescription>
@@ -333,18 +326,21 @@ export default async function SolicitacaoDetailPage({
               </CardHeader>
               <CardContent className="space-y-4">
                 {sol.sugestaoCategoria.map((sug: any, i: number) => (
-                  <div key={i} className="border rounded-lg p-4 bg-gray-50">
+                  <div
+                    key={i}
+                    className="rounded-lg border border-line bg-surface-2 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <p className="font-medium">{sug.textoSugerido}</p>
                       <SituacaoBadge situacao={sug.situacao} />
                     </div>
                     {sug.categoriaCriadaId && (
-                      <p className="text-sm text-green-600 mt-1">
+                      <p className="text-sm text-positive mt-1">
                         Categoria criada: {sug.categoriaCriadaId}
                       </p>
                     )}
                     {sug.justificativaInterna && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-ink-soft mt-1">
                         Justificativa: {sug.justificativaInterna}
                       </p>
                     )}
@@ -355,9 +351,12 @@ export default async function SolicitacaoDetailPage({
           )}
 
           {sol.motivoIncompleta && (
-            <Alert variant="default" className="border-amber-200 bg-amber-50">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-amber-800">
+            <Alert
+              variant="default"
+              className="border-warning/30 bg-warning-tint"
+            >
+              <AlertCircle className="h-4 w-4 text-warning" />
+              <AlertTitle className="text-warning">
                 Solicitação incompleta
               </AlertTitle>
               <AlertDescription>{sol.motivoIncompleta}</AlertDescription>
@@ -366,7 +365,7 @@ export default async function SolicitacaoDetailPage({
         </div>
 
         <div className="space-y-6">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Ação</CardTitle>
               <CardDescription>
@@ -378,12 +377,12 @@ export default async function SolicitacaoDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Histórico</CardTitle>
               <CardDescription>Informações da solicitação</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-gray-600">
+            <CardContent className="space-y-2 text-sm text-ink-soft">
               <div className="flex justify-between">
                 <span>ID</span>
                 <span className="font-mono text-xs">{sol.id}</span>
@@ -405,7 +404,7 @@ export default async function SolicitacaoDetailPage({
                   <span>Negócio criado</span>
                   <Link
                     href={`/admin/negocios/${sol.negocioId}`}
-                    className="text-blue-600 hover:underline"
+                    className="inline-flex min-h-10 items-center text-sm font-medium text-brand hover:text-brand-strong hover:underline"
                   >
                     Ver negócio
                   </Link>
@@ -459,7 +458,7 @@ async function ForumTab({
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card size="sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -518,7 +517,10 @@ async function ForumTab({
             result.publicacoes &&
             result.publicacoes.length > 0 ? (
               result.publicacoes.map((pub: any) => (
-                <div key={pub.id} className="border rounded-lg p-4 bg-gray-50">
+                <div
+                  key={pub.id}
+                  className="rounded-lg border border-line bg-surface-2 p-4"
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -536,25 +538,25 @@ async function ForumTab({
                         >
                           {pub.tipo}
                         </Badge>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-ink-mute">
                           {new Date(pub.criadaEm).toLocaleString("pt-BR")}
                         </span>
                       </div>
                       <p className="whitespace-pre-wrap">{pub.conteudo}</p>
                       {pub.comentarioPaiId && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-ink-mute mt-1">
                           Resposta a comentário
                         </p>
                       )}
                     </div>
                     {pub.editada && (
-                      <span className="text-xs text-gray-400">(editada)</span>
+                      <span className="text-xs text-ink-mute">(editada)</span>
                     )}
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-8">
+              <p className="text-ink-mute text-center py-8">
                 Nenhuma publicação no fórum ainda.
               </p>
             )}
@@ -579,7 +581,7 @@ async function ContestacaoTab({
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card size="sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -639,7 +641,10 @@ async function ContestacaoTab({
             result.contestacoes &&
             result.contestacoes.length > 0 ? (
               result.contestacoes.map((cont: any) => (
-                <div key={cont.id} className="border rounded-lg p-4 bg-gray-50">
+                <div
+                  key={cont.id}
+                  className="rounded-lg border border-line bg-surface-2 p-4"
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -660,7 +665,7 @@ async function ContestacaoTab({
                         >
                           {getSituacaoContestacaoLabel(cont.situacao)}
                         </Badge>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-ink-mute">
                           {new Date(cont.criadaEm).toLocaleString("pt-BR")}
                         </span>
                       </div>
@@ -668,8 +673,8 @@ async function ContestacaoTab({
                         {cont.fundamentacao}
                       </p>
                       {cont.votacao && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded">
-                          <p className="text-sm text-blue-800">
+                        <div className="mt-2 p-2 border border-brand/20 bg-brand-tint rounded">
+                          <p className="text-sm text-brand-strong">
                             <Vote className="h-4 w-4 inline mr-1" />
                             Votação:{" "}
                             <span className="font-medium">
@@ -683,7 +688,7 @@ async function ContestacaoTab({
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-8">
+              <p className="text-ink-mute text-center py-8">
                 Nenhuma contestação registrada.
               </p>
             )}

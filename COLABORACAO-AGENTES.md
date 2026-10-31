@@ -293,3 +293,44 @@ Estado verificado em produção (`https://guiabg.com.br`): `/`, `/catalogo`, `/c
   no app: o `baseURL` do Playwright agora usa `localhost` e o modo dev deve ser
   aberto pelo mesmo host. A suspeita inicial de "dev não hidrata" era sintoma
   disso, não um defeito da aplicação.
+
+### 9.10 Interface aprovada implementada (31/10, sétima parte)
+
+Fases 1 a 5 do guia de frontend (`ORIENTACOES-DEEPSEEK.md`). Não toquei em
+`src/domain`, `src/infrastructure` nem em `src/application` (única adição: um caso
+de uso de leitura de termos vigentes para as páginas legais).
+
+- **Bloqueios de base corrigidos primeiro:** `globals.css` estava sintaticamente
+  quebrado no fim (regras coladas com `.`), o tema usava `data-theme` no provider
+  mas `.dark` no CSS (modo escuro morto) e as fontes eram Geist. Agora: tokens do
+  guia em `globals.css`, `[data-theme="dark"]`, Fraunces + Source Sans 3 via
+  `next/font`.
+- **Shell público único** (`(public)/layout.tsx`): header sticky com menu mobile
+  acessível, tema, Entrar/Painel e Participar; rodapé escuro; "Pular para o
+  conteúdo". A página do comércio tinha header duplicado — removido.
+- **Home** refeita na ordem aprovada: herói com o pontilhado (única textura),
+  busca, categorias, carrossel "Achados", "Gente daqui", faixa vermelha e lista
+  final. Saíram métrica inventada ("mais acessados") e o degradê do herói.
+- **Catálogo**: 9 por página, filtros em coluna no desktop e painel no mobile,
+  chips removíveis, contagem, paginação e vazio com ação.
+- **Comércio**: galeria 3:2 com fallback desenhado, selo "Do guia", contatos sem
+  campo vazio, horários por dia com "hoje" e "Fechado", JSON-LD LocalBusiness +
+  BreadcrumbList, compartilhar com fallback de cópia.
+- **Wizard de participação em 4 etapas** com e-mail obrigatório e dica de retorno,
+  editor de horário (dias, faixas, digitação, intervalo validado, "somente sob
+  agendamento") e pop-up de confirmação com protocolo — sem redirecionar para
+  tela de sucesso.
+- **Horário sem migration:** o intervalo vira dois registros em
+  `horario_funcionamento` e "somente sob agendamento" vai em `observacao`.
+- **Admin** alinhado (subagente): sidebar escura com marca e "Admin", item
+  "Comércios", etiquetas "restrito" em Fórum/Votações, zero azul, densidade
+  maior. Dashboard deixou de ser um h1 solto.
+- **Login/recuperação** na mesma linguagem, com mensagem neutra.
+- **Termos e privacidade** passaram a existir como páginas lendo `documento_termo`
+  vigente (antes o rodapé apontava para 404).
+- **Gates:** typecheck OK, lint 0 erros, unit **216**, integração **36**, E2E **10**
+  (novo cenário do wizard).
+
+Pendências em `docs-dev/07-interface.md`: filtro "aberto agora" no catálogo (exige
+mudança em `buscarNegocios`), galeria com fotos aprovadas (o catálogo não devolve
+imagens) e diálogo de correção próprio (hoje leva para `/solicitar?negocio=<id>`).

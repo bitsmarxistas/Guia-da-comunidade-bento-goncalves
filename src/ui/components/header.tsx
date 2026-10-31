@@ -1,8 +1,7 @@
 // src/ui/components/header.tsx
 "use client";
 
-import { cn } from "@/lib/utils";
-import { Menu, Bell, Search, User, LogOut, Sun, Moon } from "lucide-react";
+import { Menu, Bell, Search, User, Sun, Moon } from "lucide-react";
 import { Button } from "@/ui/components/button";
 import { useTheme } from "next-themes";
 
@@ -17,38 +16,34 @@ export function Header({ admin }: HeaderProps) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-30 h-16 bg-white border-b border-gray-200",
-        "lg:pl-64",
-      )}
-    >
-      <div className="flex h-full items-center justify-between px-4 sm:px-6">
-        {/* Mobile menu button */}
+    <header className="sticky top-0 z-30 border-b border-line bg-surface/95">
+      <div className="flex h-14 items-center gap-2 px-4 sm:gap-4 sm:px-6">
+        {/* Menu mobile */}
         <Button
           variant="ghost"
           size="icon"
           className="lg:hidden"
           aria-label="Abrir menu"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </Button>
 
-        {/* Search */}
-        <div className="hidden sm:block flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="search"
-              placeholder="Buscar..."
-              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        {/* Busca */}
+        <div className="relative hidden min-w-0 flex-1 sm:block sm:max-w-md">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-mute"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            placeholder="Buscar no painel..."
+            aria-label="Buscar no painel"
+            className="h-10 w-full rounded-lg border border-line bg-surface-2 pr-3 pl-9 text-sm text-ink transition-colors placeholder:text-ink-mute focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/25 focus-visible:outline-none"
+          />
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* Theme toggle */}
+        {/* Ações */}
+        <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
@@ -62,26 +57,22 @@ export function Header({ admin }: HeaderProps) {
             )}
           </Button>
 
-          {/* Notifications */}
           <Button variant="ghost" size="icon" aria-label="Notificações">
             <Bell className="h-5 w-5" />
           </Button>
 
-          {/* User menu */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              className="gap-2 pr-3 pl-3"
-              aria-label="Menu do usuário"
-            >
-              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <User className="h-5 w-5 text-blue-700" />
-              </div>
-              <span className="hidden md:block text-sm font-medium text-gray-700">
-                {admin.nome}
-              </span>
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            className="gap-2 pr-3 pl-3"
+            aria-label="Menu do usuário"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-tint text-brand">
+              <User className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <span className="hidden text-sm font-medium text-ink-soft md:block">
+              {admin.nome}
+            </span>
+          </Button>
         </div>
       </div>
     </header>

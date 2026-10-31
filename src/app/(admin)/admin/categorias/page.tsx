@@ -1,4 +1,4 @@
-// src/app/(admin)/categorias/page.tsx
+// src/app/(admin)/admin/categorias/page.tsx
 import { listarCategoriasAction } from "@/application/categorias/listar";
 import { Button } from "@/ui/components/button";
 import { Input } from "@/ui/components/input";
@@ -14,8 +14,9 @@ import {
   TableRow,
 } from "@/ui/components/table";
 import { Badge } from "@/ui/components/badge";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
 export default async function CategoriasPage({
   searchParams,
@@ -47,38 +48,41 @@ export default async function CategoriasPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Categorias</h1>
-          <p className="text-gray-600">Gerenciar categorias do catálogo</p>
-        </div>
-        <Link href="/admin/categorias/novo">
-          <Button>Nova Categoria</Button>
-        </Link>
-      </div>
+      <AdminPageHeader
+        title="Categorias"
+        description="Organizar as categorias do catálogo do GuiaBG."
+      >
+        <Button asChild size="sm" className="h-10">
+          <Link href="/admin/categorias/novo">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Nova categoria
+          </Link>
+        </Button>
+      </AdminPageHeader>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2 flex-1 min-w-[200px]">
+          <form className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  🔍
-                </span>
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-mute"
+                  aria-hidden="true"
+                />
                 <Input
                   id="busca"
                   name="busca"
                   placeholder="Nome da categoria..."
                   value={params.busca || ""}
-                  className="pl-10"
+                  className="h-10 pl-10"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="ativa">Status</Label>
               <NativeSelect id="ativa" name="ativa" value={params.ativa || ""}>
                 <option value="">Todas</option>
@@ -86,15 +90,15 @@ export default async function CategoriasPage({
                 <option value="false">Inativas</option>
               </NativeSelect>
             </div>
-            <Button type="submit">
-              <span className="mr-2">🔍</span>
+            <Button type="submit" size="sm" className="h-10">
+              <Search className="h-4 w-4" aria-hidden="true" />
               Filtrar
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -112,7 +116,7 @@ export default async function CategoriasPage({
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center py-8 text-gray-500"
+                      className="py-8 text-center text-ink-mute"
                     >
                       Nenhuma categoria encontrada
                     </TableCell>
@@ -128,19 +132,26 @@ export default async function CategoriasPage({
                     }) => (
                       <TableRow key={cat.id}>
                         <TableCell>
-                          <p className="font-medium">{cat.nome}</p>
+                          <p className="font-medium text-ink">{cat.nome}</p>
                         </TableCell>
                         <TableCell>
-                          <span className="text-gray-500 text-sm">
+                          <span className="text-sm text-ink-mute">
                             {cat.slug}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={cat.ativa ? "default" : "outline"}>
+                          <Badge
+                            variant="outline"
+                            className={
+                              cat.ativa
+                                ? "border-positive/30 bg-positive-tint text-positive"
+                                : "border-line bg-surface-2 text-ink-soft"
+                            }
+                          >
                             {cat.ativa ? "Ativa" : "Inativa"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-ink-soft">
                           {new Date(cat.criadoEm).toLocaleDateString("pt-BR", {
                             day: "2-digit",
                             month: "2-digit",
@@ -150,7 +161,7 @@ export default async function CategoriasPage({
                         <TableCell className="text-right">
                           <Link
                             href={`/admin/categorias/${cat.id}`}
-                            className="text-blue-600 hover:underline text-sm"
+                            className="inline-flex min-h-10 items-center text-sm font-medium text-brand transition-colors hover:text-brand-strong hover:underline"
                           >
                             Editar
                           </Link>
@@ -165,8 +176,8 @@ export default async function CategoriasPage({
         </CardContent>
 
         {totalPaginas > 1 && (
-          <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4">
+            <p className="text-sm text-ink-soft">
               Mostrando {(pagina - 1) * 20 + 1} a {Math.min(pagina * 20, total)}{" "}
               de {total} resultados
             </p>
@@ -174,19 +185,19 @@ export default async function CategoriasPage({
               {currentPagina > 1 && (
                 <Link
                   href={`/admin/categorias?pagina=${currentPagina - 1}${params.ativa ? `&ativa=${params.ativa}` : ""}${params.busca ? `&busca=${params.busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    Anterior
-                  </Button>
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  Anterior
                 </Link>
               )}
               {currentPagina < totalPaginas && (
                 <Link
                   href={`/admin/categorias?pagina=${currentPagina + 1}${params.ativa ? `&ativa=${params.ativa}` : ""}${params.busca ? `&busca=${params.busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    Próxima
-                  </Button>
+                  Próxima
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               )}
             </div>

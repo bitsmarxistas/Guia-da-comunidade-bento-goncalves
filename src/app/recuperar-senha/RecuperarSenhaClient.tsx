@@ -91,12 +91,12 @@ export default function RecuperarSenhaClient() {
 
   if (stage === "redefinir" && !token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
         <div className="w-full max-w-md text-center">
-          <p className="text-red-600">Token inválido ou expirado</p>
+          <p className="text-critical">Token inválido ou expirado</p>
           <a
             href="/recuperar-senha"
-            className="text-blue-600 hover:underline mt-4 inline-block"
+            className="mt-4 inline-block font-semibold text-brand underline-offset-4 hover:underline"
           >
             Solicitar novo e-mail
           </a>
@@ -106,28 +106,36 @@ export default function RecuperarSenhaClient() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-md">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {stage === "solicitar" ? "Recuperar Senha" : "Redefinir Senha"}
+            <CardTitle className="font-[family-name:var(--font-fraunces)] text-2xl">
+              {stage === "solicitar" ? "Recuperar senha" : "Definir nova senha"}
             </CardTitle>
             <CardDescription>
               {stage === "solicitar"
-                ? "Digite seu e-mail para receber instruções"
+                ? "Informe seu e-mail. Se o endereço estiver cadastrado, enviamos as instruções."
                 : "Digite sua nova senha"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {erro && (
-              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg mb-4">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-4 flex items-center gap-2 rounded-[12px] border border-critical/40 bg-critical-tint p-3 text-sm text-ink"
+              >
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>{erro}</span>
               </div>
             )}
             {sucesso && (
-              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg mb-4">
+              <div
+                role="status"
+                aria-live="polite"
+                className="mb-4 flex items-center gap-2 rounded-[12px] border border-positive/40 bg-positive-tint p-3 text-sm text-ink"
+              >
                 <CheckCircle className="h-4 w-4 flex-shrink-0" />
                 <span>{sucesso}</span>
               </div>
@@ -138,11 +146,11 @@ export default function RecuperarSenhaClient() {
                 <div className="space-y-2">
                   <Label htmlFor="email">E-mail</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-ink-mute" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="admin@diretorio.local"
+                      placeholder="voce@exemplo.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-10"
@@ -190,7 +198,10 @@ export default function RecuperarSenhaClient() {
             )}
           </CardContent>
           <CardFooter className="flex justify-center">
-            <a href="/login" className="text-sm text-blue-600 hover:underline">
+            <a
+              href="/login"
+              className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
+            >
               Voltar para o login
             </a>
           </CardFooter>

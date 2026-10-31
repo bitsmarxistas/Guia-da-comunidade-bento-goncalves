@@ -1,111 +1,119 @@
-// src/app/(admin)/configuracoes/page.tsx
+// src/app/(admin)/admin/configuracoes/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
 import { Button } from "@/ui/components/button";
+import { Input } from "@/ui/components/input";
+import { Label } from "@/ui/components/label";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
 export default async function ConfiguracoesPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-          <p className="text-gray-600">Gerenciar configurações do sistema</p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Configurações"
+        description="Gerenciar dados institucionais e limites do GuiaBG."
+      />
 
-      <div className="space-y-6">
-        <Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Configurações Gerais</CardTitle>
+            <CardTitle>Configurações gerais</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome do Diretório
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="nome-guia">Nome do GuiaBG</Label>
+                <Input
+                  id="nome-guia"
                   type="text"
                   defaultValue="GuiaBG"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  E-mail Institucional
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="email-institucional">
+                  E-mail institucional
+                </Label>
+                <Input
+                  id="email-institucional"
                   type="email"
                   defaultValue="contato@guiabg.com.br"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  E-mail DPO (LGPD)
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="email-dpo">E-mail DPO (LGPD)</Label>
+                <Input
+                  id="email-dpo"
                   type="email"
                   defaultValue="dpo@guiabg.com.br"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button>Salvar</Button>
-                <Button variant="outline">Cancelar</Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" className="h-10">
+                  Salvar
+                </Button>
+                <Button variant="outline" size="sm" className="h-10">
+                  Cancelar
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Limites e Regras</CardTitle>
+            <CardTitle>Limites e regras</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Máx. Imagens por Negócio
-                </label>
-                <input
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="max-imagens">Máx. imagens por comércio</Label>
+                <Input
+                  id="max-imagens"
                   type="number"
                   defaultValue="5"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Máx. Tamanho da Imagem (MB)
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="max-tamanho-imagem">
+                  Máx. tamanho da imagem (MB)
+                </Label>
+                <Input
+                  id="max-tamanho-imagem"
                   type="number"
                   defaultValue="5"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Máx. Anexos por Solicitação
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="max-anexos">Máx. anexos por solicitação</Label>
+                <Input
+                  id="max-anexos"
                   type="number"
                   defaultValue="3"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tamanho Máx. Anexo (MB)
-                </label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="max-tamanho-anexo">
+                  Tamanho máx. do anexo (MB)
+                </Label>
+                <Input
+                  id="max-tamanho-anexo"
                   type="number"
                   defaultValue="10"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border rounded-md"
+                  className="h-10"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button>Salvar Limites</Button>
-                <Button variant="outline">Cancelar</Button>
+              <div className="flex flex-wrap gap-2 sm:col-span-2">
+                <Button size="sm" className="h-10">
+                  Salvar limites
+                </Button>
+                <Button variant="outline" size="sm" className="h-10">
+                  Cancelar
+                </Button>
               </div>
             </div>
           </CardContent>

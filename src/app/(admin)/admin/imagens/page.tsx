@@ -5,6 +5,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
 import { Toaster } from "@/ui/components/sonner";
 import { ImageOff } from "lucide-react";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import {
   ImagemFilaModeracao,
   type ImagemFilaItem,
@@ -53,61 +54,65 @@ export default async function ImagensPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Imagens</h1>
-          <p className="text-muted-foreground">
-            Moderar imagens enviadas por solicitantes
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Imagens"
+        description="Moderar imagens enviadas por solicitantes antes da publicação."
+      />
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Pendentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{pendentes}</p>
+            <p className="text-3xl font-semibold text-warning tabular-nums">
+              {pendentes}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Aprovadas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{aprovadas}</p>
+            <p className="text-3xl font-semibold text-positive tabular-nums">
+              {aprovadas}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Rejeitadas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{rejeitadas}</p>
+            <p className="text-3xl font-semibold text-critical tabular-nums">
+              {rejeitadas}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Fila de Moderação</h2>
+      <section aria-labelledby="fila-moderacao" className="space-y-4">
+        <h2 id="fila-moderacao" className="text-lg font-semibold text-ink">
+          Fila de moderação
+        </h2>
         {imagensPendentes.length > 0 ? (
           <ImagemFilaModeracao imagens={imagensPendentes} />
         ) : (
-          <Card>
+          <Card size="sm">
             <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
-              <ImageOff className="h-8 w-8 text-muted-foreground" />
-              <p className="font-medium text-foreground">
+              <ImageOff className="h-8 w-8 text-ink-mute" aria-hidden="true" />
+              <p className="font-medium text-ink">
                 Nenhuma imagem pendente de moderação
               </p>
-              <p className="max-w-md text-sm text-muted-foreground">
+              <p className="max-w-md text-sm text-ink-soft">
                 Quando solicitantes enviarem imagens para moderação, elas vão
                 aparecer nesta fila para aprovação ou rejeição.
               </p>
             </CardContent>
           </Card>
         )}
-      </div>
+      </section>
 
       <Toaster position="bottom-right" richColors />
     </div>

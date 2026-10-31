@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import { CatalogoView } from "../_components/catalogo-view";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
-  title: "Busca | GuiaBG",
-  description: "Busque negócios, serviços e iniciativas de Bento Gonçalves.",
-  alternates: { canonical: "/busca" },
+  title: "Busca",
+  description: "Busque comércios e serviços de Bento Gonçalves.",
   robots: { index: false, follow: true },
 };
 

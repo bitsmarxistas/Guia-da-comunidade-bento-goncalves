@@ -2,14 +2,41 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* O tema é aplicado por `data-theme` no <html> (next-themes). O CSS precisa usar
+   o MESMO seletor, senão o modo escuro simplesmente não existe. */
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-source-sans);
+  --font-display: var(--font-fraunces);
+  --font-mono: var(--font-source-mono, ui-monospace, monospace);
+  --font-heading: var(--font-fraunces);
+
+  /* Marca e estados (nomes do design system aprovado) */
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-tint: var(--brand-tint);
+  --color-on-brand: var(--on-brand);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-positive: var(--positive);
+  --color-positive-tint: var(--positive-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-critical: var(--critical);
+  --color-critical-tint: var(--critical-tint);
+  --color-sun: var(--sun);
+  --color-sun-tint: var(--sun-tint);
+  --color-sun-ink: var(--sun-ink);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,97 +66,279 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-2xl: 22px;
+  --radius-3xl: 26px;
+  --radius-4xl: 30px;
 }
 
+/* ── Tema claro ─────────────────────────────────────────────────────────── */
 :root {
-  /* GuiaBG Brand Colors - Bento Gonçalves Community Directory */
-  /* Inspired by the region: wine/serra gaúcha tones - deep burgundy, warm gold, earth tones */
-  --background: oklch(0.99 0.002 45); /* Warm off-white */
-  --foreground: oklch(0.18 0.02 30); /* Dark charcoal with warmth */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 30);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 30);
-  --primary: oklch(0.42 0.22 25); /* Deep burgundy/wine */
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.94 0.03 45); /* Warm cream */
-  --secondary-foreground: oklch(0.25 0.03 30);
-  --muted: oklch(0.96 0.01 45);
-  --muted-foreground: oklch(0.45 0.02 30);
-  --accent: oklch(0.72 0.18 75); /* Warm gold/amber */
-  --accent-foreground: oklch(0.15 0.02 30);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.02 45);
-  --input: oklch(0.92 0.01 45);
-  --ring: oklch(0.42 0.22 25);
-  --chart-1: oklch(0.42 0.22 25);
-  --chart-2: oklch(0.72 0.18 75);
-  --chart-3: oklch(0.55 0.15 140);
-  --chart-4: oklch(0.65 0.2 30);
-  --chart-5: oklch(0.55 0.15 140);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.98 0.005 45);
-  --sidebar-foreground: oklch(0.18 0.02 30);
-  --sidebar-primary: oklch(0.42 0.22 25);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.94 0.03 45);
-  --sidebar-accent-foreground: oklch(0.25 0.03 30);
-  --sidebar-border: oklch(0.88 0.02 45);
-  --sidebar-ring: oklch(0.42 0.22 25);
-  --background: oklch(0.99 0.002 45);
-  --foreground: oklch(0.18 0.02 30);
+  /* Marca */
+  --brand: #c41e3a;
+  --brand-strong: #a31630;
+  --brand-tint: #fbe6ea;
+  --brand-wash: #fdf1f3;
+  --on-brand: #ffffff;
+
+  /* Superfícies */
+  --canvas: #f7f4f4;
+  --surface: #ffffff;
+  --surface-2: #f1ecec;
+
+  /* Texto */
+  --ink: #1c1618;
+  --ink-soft: #574e51;
+  --ink-mute: #83787b;
+
+  /* Linhas */
+  --line: #e7e0e2;
+  --line-strong: #d4c9cc;
+
+  /* Funcionais */
+  --positive: #17794d;
+  --positive-tint: #e2f4ea;
+  --warning: #8a5a00;
+  --warning-tint: #fbefd6;
+  --critical: #d92d20;
+  --critical-tint: #fce8e4;
+  --sun: #de8a33;
+  --sun-tint: #fceddc;
+  --sun-ink: #6b3a0b;
+  --focus: #1c1618;
+
+  /* Mapeamento para os nomes que os componentes já usam */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--brand-tint);
+  --accent-foreground: var(--brand-strong);
+  --destructive: var(--critical);
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--focus);
+  --chart-1: var(--brand);
+  --chart-2: var(--positive);
+  --chart-3: var(--warning);
+  --chart-4: var(--sun);
+  --chart-5: var(--ink-mute);
+  --radius: 14px;
+
+  /* Sidebar do admin: escura, sem azul */
+  --sidebar: #1c1618;
+  --sidebar-foreground: #f7eff0;
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: #2a2224;
+  --sidebar-accent-foreground: #f7eff0;
+  --sidebar-border: #332629;
+  --sidebar-ring: #ff8fa0;
 }
 
-.dark {
-  --background: oklch(0.12 0.01 30);
-  --foreground: oklch(0.96 0.01 45);
-  --card: oklch(0.15 0.01 30);
-  --card-foreground: oklch(0.96 0.01 45);
-  --popover: oklch(0.15 0.01 30);
-  --popover-foreground: oklch(0.96 0.01 45);
-  --primary: oklch(0.58 0.22 25);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.22 0.02 30);
-  --secondary-foreground: oklch(0.96 0.01 45);
-  --muted: oklch(0.22 0.02 30);
-  --muted-foreground: oklch(0.65 0.02 45);
-  --accent: oklch(0.65 0.2 75);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.25 0.02 30);
-  --input: oklch(0.22 0.02 30);
-  --ring: oklch(0.58 0.22 25);
-  --chart-1: oklch(0.58 0.22 25);
-  --chart-2: oklch(0.72 0.18 75);
-  --chart-4: oklch(0.65 0.2 30);
-  --chart-5: oklch(0.55 0.15 140);
-  --sidebar: oklch(0.15 0.01 30);
-  --sidebar-foreground: oklch(0.96 0.01 45);
-  --sidebar-primary: oklch(0.58 0.22 25);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.22 0.02 30);
-  --sidebar-accent-foreground: oklch(0.96 0.01 45) .
-    --sidebar-border: oklch(0.25 0.02 30) . --sidebar-ring: oklch(0.58 0.22 25)
-    . --background: oklch(0.12 0.01 30) . --foreground: oklch(0.96 0.01 45) .;
+/* ── Tema escuro ────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --brand: #ff6b80;
+  --brand-strong: #ff8fa0;
+  --brand-tint: #3a121c;
+  --brand-wash: #2a0d14;
+  --on-brand: #2b0710;
+
+  --canvas: #120d0e;
+  --surface: #1a1416;
+  --surface-2: #241b1d;
+
+  --ink: #f7eff0;
+  --ink-soft: #c9b8bb;
+  --ink-mute: #9c878b;
+
+  --line: #332629;
+  --line-strong: #4a383c;
+
+  --positive: #74e0b4;
+  --positive-tint: #0f3125;
+  --warning: #f2c46e;
+  --warning-tint: #2e2411;
+  --critical: #ff8a7a;
+  --critical-tint: #341716;
+  --sun: #f5b06b;
+  --sun-tint: #33250f;
+  --sun-ink: #ffe0b8;
+  --focus: #f7eff0;
+
+  --destructive-foreground: #2b0710;
+
+  --sidebar: #0e0a0b;
+  --sidebar-foreground: #f7eff0;
+  --sidebar-accent: #241b1d;
+  --sidebar-accent-foreground: #f7eff0;
+  --sidebar-border: #332629;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* Foco visível em tudo, inclusive sobre o vermelho (RNF-004 / WCAG 2.2) */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+
+  /* Números tabulares em horários, contagens e tabelas */
+  time,
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Container aprovado: 1200px com gutter de 24px (20px no mobile) */
+  .container-page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: 20px;
+  }
+
+  @media (min-width: 768px) {
+    .container-page {
+      padding-inline: 24px;
+    }
+  }
+
+  .display {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-size: clamp(2.6rem, 5.2vw, 4.1rem);
+    line-height: 1.04;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .h1-editorial {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  /* ÚNICA textura aprovada: pontilhado esmaecido do herói.
+     Pontos vermelhos com máscara de fade lateral — sem degradê de fundo,
+     sem brilho radial. */
+  .hero-dots::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--brand) 55%, transparent) 1.1px,
+      transparent 1.2px
+    );
+    background-size: 16px 16px;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      #000 22%,
+      #000 62%,
+      transparent 96%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      #000 22%,
+      #000 62%,
+      transparent 96%
+    );
+    opacity: 0.5;
+  }
+
+  /* Trilho de carrossel: scroll nativo, barra oculta, snap suave */
+  .carrossel-trilho {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0.25rem;
+  }
+
+  .carrossel-trilho::-webkit-scrollbar {
+    display: none;
+  }
+
+  .carrossel-trilho > * {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+
+  .leitura {
+    max-width: 68ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

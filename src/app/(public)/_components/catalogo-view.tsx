@@ -1,20 +1,13 @@
 import Link from "next/link";
+import { Building2, X } from "lucide-react";
 import {
   buscarNegocios,
   listarCategoriasAtivas,
   listarBairrosComNegocios,
 } from "@/application/catalogo";
 import { NegocioCard } from "./negocio-card";
+import { FiltrosPainel } from "./filtros-painel";
 import { Button } from "@/ui/components/button";
-import { Badge } from "@/ui/components/badge";
-import {
-  Building2,
-  MapPin,
-  Search,
-  SlidersHorizontal,
-  Tag,
-  X,
-} from "lucide-react";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -27,7 +20,7 @@ const ORDENACOES: Array<{ valor: Ordenacao; rotulo: string }> = [
   { valor: "nome_desc", rotulo: "Nome (Z-A)" },
 ];
 
-const POR_PAGINA = 20;
+const POR_PAGINA = 9;
 
 function toArray(valor: string | string[] | undefined): string[] {
   if (!valor) return [];
@@ -78,8 +71,9 @@ function montarUrl(
     }
   }
 
-  if (opcoes.pagina && opcoes.pagina > 1)
+  if (opcoes.pagina && opcoes.pagina > 1) {
     search.set("pagina", String(opcoes.pagina));
+  }
 
   const query = search.toString();
   return query ? `${basePath}?${query}` : basePath;
@@ -127,363 +121,296 @@ export async function CatalogoView({
   });
 
   const { negocios, paginacao } = resultado;
-  const temFiltros =
-    Boolean(termo) ||
-    categoriasSelecionadas.length > 0 ||
-    bairrosSelecionados.length > 0 ||
-    ordenacao !== "relevancia";
+  const filtrosAtivos =
+    (termo ? 1 : 0) +
+    categoriasSelecionadas.length +
+    bairrosSelecionados.length +
+    (ordenacao !== "relevancia" ? 1 : 0);
+  const temFiltros = filtrosAtivos > 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <nav
-          aria-label="Você está aqui"
-          className="text-sm text-muted-foreground mb-4"
-        >
-          <Link href="/" className="hover:text-primary transition-colors">
+    <div className="bg-canvas">
+      <div className="container-page py-10 md:py-12">
+        <nav aria-label="Você está aqui" className="text-sm text-ink-mute">
+          <Link href="/" className="hover:text-brand">
             Início
           </Link>
           <span aria-hidden="true" className="mx-2">
             /
           </span>
-          <span className="text-foreground">{titulo}</span>
+          <span className="text-ink">{titulo}</span>
         </nav>
 
-        <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-            {titulo}
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl">{descricao}</p>
+        <header className="mt-4 max-w-[62ch]">
+          <h1 className="h1-editorial">{titulo}</h1>
+          <p className="mt-3 text-ink-soft">{descricao}</p>
         </header>
 
-        {/* Busca (RF-002) — formulário GET funciona sem JS e preserva a URL */}
-        <form
-          method="get"
-          action={basePath}
-          role="search"
-          className="mb-8 rounded-xl border border-border bg-muted/30 p-4 sm:p-5"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label
-                htmlFor="busca-q"
-                className="block text-sm font-medium text-foreground mb-1.5"
+        {/* Chips de filtros ativos */}
+        {temFiltros ? (
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            {termo ? (
+              <Chip
+                ativo
+                href={montarUrl(basePath, searchParams, { remover: ["q"] })}
               >
-                Buscar no catálogo
-              </label>
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
+                Busca: {termo}
+              </Chip>
+            ) : null}
+            {categoriasSelecionadas.map((slug) => (
+              <Chip
+                key={slug}
+                ativo
+                href={montarUrl(basePath, searchParams, {
+                  removerValor: ["categoria", slug],
+                })}
+              >
+                {nomesPorSlug.get(slug) ?? slug}
+              </Chip>
+            ))}
+            {bairrosSelecionados.map((bairro) => (
+              <Chip
+                key={bairro}
+                ativo
+                href={montarUrl(basePath, searchParams, {
+                  removerValor: ["bairro", bairro],
+                })}
+              >
+                {bairro}
+              </Chip>
+            ))}
+            {ordenacao !== "relevancia" ? (
+              <Chip
+                ativo
+                href={montarUrl(basePath, searchParams, { remover: ["ordem"] })}
+              >
+                {ORDENACOES.find((o) => o.valor === ordenacao)?.rotulo}
+              </Chip>
+            ) : null}
+
+            <Link
+              href={basePath}
+              className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
+            >
+              Limpar filtros
+            </Link>
+          </div>
+        ) : null}
+
+        <div className="mt-8 grid gap-8 md:grid-cols-[264px_1fr] md:gap-10">
+          <FiltrosPainel ativos={filtrosAtivos}>
+            <form method="get" action={basePath} className="space-y-6">
+              <div>
+                <label
+                  htmlFor="filtro-busca"
+                  className="mb-2 block text-[13px] font-semibold text-ink"
+                >
+                  Buscar
+                </label>
                 <input
-                  id="busca-q"
+                  id="filtro-busca"
                   name="q"
                   type="search"
                   defaultValue={termo}
-                  placeholder="Busque por negócio, serviço ou categoria"
-                  className="w-full rounded-lg border border-border bg-background py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  placeholder="Nome ou serviço"
+                  className="h-11 w-full rounded-[14px] border border-line-strong bg-surface px-3 text-sm text-ink placeholder:text-ink-mute focus-visible:border-brand"
                 />
               </div>
-            </div>
 
-            <div className="sm:w-56">
-              <label
-                htmlFor="busca-ordem"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Ordenar por
-              </label>
-              <select
-                id="busca-ordem"
-                name="ordem"
-                defaultValue={ordenacao}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {ORDENACOES.map((o) => (
-                  <option key={o.valor} value={o.valor}>
-                    {o.rotulo}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <Button type="submit" size="lg" className="gap-2 sm:w-auto">
-              <Search className="h-4 w-4" aria-hidden="true" />
-              Buscar
-            </Button>
-          </div>
-        </form>
-
-        <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
-          {/* Filtros (RF-003 / RF-004) */}
-          <aside aria-label="Filtros do catálogo" className="space-y-6">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal
-                className="h-4 w-4 text-primary"
-                aria-hidden="true"
-              />
-              <h2 className="font-semibold text-foreground">Filtros</h2>
-            </div>
-
-            <form method="get" action={basePath} className="space-y-6">
-              {termo && <input type="hidden" name="q" value={termo} />}
-              {ordenacao !== "relevancia" && (
-                <input type="hidden" name="ordem" value={ordenacao} />
-              )}
-
-              <fieldset className="space-y-2">
-                <legend className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <Tag
-                    className="h-4 w-4 text-muted-foreground"
-                    aria-hidden="true"
-                  />
+              <fieldset>
+                <legend className="mb-2 text-[13px] font-semibold text-ink">
                   Categoria
                 </legend>
-                <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5 border border-border rounded-lg p-2 bg-background">
-                  {categorias.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma categoria ativa.
-                    </p>
-                  )}
+                <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
                   {categorias.map((categoria) => (
                     <label
                       key={categoria.id}
-                      htmlFor={`cat-${categoria.id}`}
-                      className="flex items-center gap-2 text-sm text-foreground cursor-pointer rounded px-1 py-0.5"
+                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
                     >
                       <input
-                        id={`cat-${categoria.id}`}
                         type="checkbox"
                         name="categoria"
                         value={categoria.slug}
                         defaultChecked={categoriasSelecionadas.includes(
                           categoria.slug,
                         )}
-                        className="h-4 w-4 rounded border-border accent-[color:var(--primary)]"
+                        className="size-4 accent-[var(--brand)]"
                       />
-                      <span>{categoria.nome}</span>
+                      {categoria.nome}
                     </label>
                   ))}
                 </div>
               </fieldset>
 
-              <fieldset className="space-y-2">
-                <legend className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <MapPin
-                    className="h-4 w-4 text-muted-foreground"
-                    aria-hidden="true"
-                  />
+              <fieldset>
+                <legend className="mb-2 text-[13px] font-semibold text-ink">
                   Bairro
                 </legend>
-                <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 border border-border rounded-lg p-2 bg-background">
-                  {bairros.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum bairro informado.
-                    </p>
-                  )}
+                <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
                   {bairros.map((bairro) => (
                     <label
                       key={bairro.bairro}
-                      htmlFor={`bairro-${bairro.bairro}`}
-                      className="flex items-center gap-2 text-sm text-foreground cursor-pointer rounded px-1 py-0.5"
+                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-1 text-sm text-ink-soft hover:text-ink"
                     >
                       <input
-                        id={`bairro-${bairro.bairro}`}
                         type="checkbox"
                         name="bairro"
                         value={bairro.bairro}
                         defaultChecked={bairrosSelecionados.includes(
                           bairro.bairro,
                         )}
-                        className="h-4 w-4 rounded border-border accent-[color:var(--primary)]"
+                        className="size-4 accent-[var(--brand)]"
                       />
-                      <span>
-                        {bairro.bairro}{" "}
-                        <span className="text-muted-foreground">
-                          ({bairro.total})
-                        </span>
+                      <span className="flex-1">{bairro.bairro}</span>
+                      <span className="text-xs text-ink-mute tabular">
+                        {bairro.total}
                       </span>
                     </label>
                   ))}
                 </div>
               </fieldset>
 
-              <div className="flex flex-col gap-2">
-                <Button type="submit" variant="outline" className="w-full">
+              <div>
+                <label
+                  htmlFor="filtro-ordem"
+                  className="mb-2 block text-[13px] font-semibold text-ink"
+                >
+                  Ordenar por
+                </label>
+                <select
+                  id="filtro-ordem"
+                  name="ordem"
+                  defaultValue={ordenacao}
+                  className="h-11 w-full rounded-[14px] border border-line-strong bg-surface px-3 text-sm text-ink"
+                >
+                  {ORDENACOES.map((opcao) => (
+                    <option key={opcao.valor} value={opcao.valor}>
+                      {opcao.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
                   Aplicar filtros
                 </Button>
-                {temFiltros && (
-                  <Link
-                    href={basePath}
-                    className="inline-flex items-center justify-center gap-1 text-sm text-primary hover:underline py-1"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                    Limpar filtros
-                  </Link>
-                )}
+                <Button asChild variant="outline">
+                  <Link href={basePath}>Limpar</Link>
+                </Button>
               </div>
             </form>
-          </aside>
+          </FiltrosPainel>
 
-          {/* Resultados */}
-          <section aria-label="Resultados" className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <p className="text-sm text-muted-foreground">
-                {paginacao.total === 0
-                  ? "Nenhum resultado"
-                  : `${paginacao.total} ${paginacao.total === 1 ? "negócio encontrado" : "negócios encontrados"}`}
-                {termo && (
-                  <>
-                    {" "}
-                    para <strong className="text-foreground">“{termo}”</strong>
-                  </>
-                )}
-              </p>
-
-              {(categoriasSelecionadas.length > 0 ||
-                bairrosSelecionados.length > 0) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {categoriasSelecionadas.map((slug) => (
-                    <Link
-                      key={`cat-${slug}`}
-                      href={montarUrl(basePath, searchParams, {
-                        removerValor: ["categoria", slug],
-                      })}
-                      aria-label={`Remover filtro de categoria ${nomesPorSlug.get(slug) ?? slug}`}
-                    >
-                      <Badge variant="secondary" className="gap-1.5">
-                        {nomesPorSlug.get(slug) ?? slug}
-                        <X className="h-3 w-3" aria-hidden="true" />
-                      </Badge>
-                    </Link>
-                  ))}
-                  {bairrosSelecionados.map((bairro) => (
-                    <Link
-                      key={`bairro-${bairro}`}
-                      href={montarUrl(basePath, searchParams, {
-                        removerValor: ["bairro", bairro],
-                      })}
-                      aria-label={`Remover filtro de bairro ${bairro}`}
-                    >
-                      <Badge variant="secondary" className="gap-1.5">
-                        {bairro}
-                        <X className="h-3 w-3" aria-hidden="true" />
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+          <section aria-label="Resultados">
+            <p className="text-sm text-ink-soft" role="status">
+              <strong className="text-ink tabular">{paginacao.total}</strong>{" "}
+              {paginacao.total === 1
+                ? "comércio encontrado"
+                : "comércios encontrados"}
+              {paginacao.totalPaginas > 1
+                ? ` · página ${paginacao.pagina} de ${paginacao.totalPaginas}`
+                : ""}
+            </p>
 
             {negocios.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {negocios.map((negocio) => (
                   <NegocioCard key={negocio.id} negocio={negocio} />
                 ))}
               </div>
             ) : (
-              <div className="text-center py-16 border border-dashed border-border rounded-xl bg-muted/20">
+              <div className="mt-6 rounded-[22px] border border-dashed border-line bg-surface px-6 py-16 text-center">
                 <Building2
-                  className="h-12 w-12 text-muted-foreground mx-auto mb-4"
+                  className="mx-auto size-10 text-ink-mute"
                   aria-hidden="true"
                 />
-                <h2 className="text-xl font-semibold text-foreground mb-2">
+                <h2 className="mt-4 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-ink">
                   {temFiltros
-                    ? "Nenhum negócio com esses filtros"
+                    ? "Nenhum comércio com esses filtros"
                     : "O catálogo ainda está começando"}
                 </h2>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                <p className="mx-auto mt-2 max-w-[46ch] text-ink-soft">
                   {temFiltros
                     ? "Tente outra busca, remova algum filtro ou veja todas as categorias."
-                    : "Assim que os primeiros negócios forem publicados, eles aparecem aqui."}
+                    : "Assim que os primeiros comércios forem publicados, eles aparecem aqui."}
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  {temFiltros && (
-                    <Link href={basePath}>
-                      <Button variant="outline" size="lg">
-                        Limpar filtros
-                      </Button>
-                    </Link>
-                  )}
-                  <Link href="/solicitar">
-                    <Button size="lg" className="gap-2">
-                      Cadastrar meu negócio
+                <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                  {temFiltros ? (
+                    <Button asChild variant="outline">
+                      <Link href={basePath}>Limpar filtros</Link>
                     </Button>
-                  </Link>
+                  ) : null}
+                  <Button asChild>
+                    <Link href="/solicitar">Participar</Link>
+                  </Button>
                 </div>
               </div>
             )}
 
-            {paginacao.totalPaginas > 1 && (
+            {paginacao.totalPaginas > 1 ? (
               <nav
                 aria-label="Paginação"
                 className="mt-10 flex items-center justify-center gap-2"
               >
-                {pagina > 1 && (
-                  <Link
-                    href={montarUrl(basePath, searchParams, {
-                      pagina: pagina - 1,
-                    })}
-                    className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
-                  >
-                    Anterior
-                  </Link>
-                )}
+                {paginacao.pagina > 1 ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={montarUrl(basePath, searchParams, {
+                        pagina: paginacao.pagina - 1,
+                      })}
+                    >
+                      Anterior
+                    </Link>
+                  </Button>
+                ) : null}
 
-                {Array.from({ length: paginacao.totalPaginas }, (_, i) => i + 1)
-                  .filter(
-                    (n) =>
-                      n === 1 ||
-                      n === paginacao.totalPaginas ||
-                      Math.abs(n - pagina) <= 1,
-                  )
-                  .map((n, index, lista) => {
-                    const anterior = lista[index - 1];
-                    const mostrarReticencias =
-                      anterior !== undefined && n - anterior > 1;
-                    return (
-                      <span key={n} className="flex items-center gap-2">
-                        {mostrarReticencias && (
-                          <span
-                            className="text-muted-foreground"
-                            aria-hidden="true"
-                          >
-                            …
-                          </span>
-                        )}
-                        <Link
-                          href={montarUrl(basePath, searchParams, {
-                            pagina: n,
-                          })}
-                          aria-current={n === pagina ? "page" : undefined}
-                          className={
-                            n === pagina
-                              ? "rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-                              : "rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
-                          }
-                        >
-                          {n}
-                        </Link>
-                      </span>
-                    );
-                  })}
+                <span className="text-sm text-ink-soft tabular">
+                  {paginacao.pagina} / {paginacao.totalPaginas}
+                </span>
 
-                {pagina < paginacao.totalPaginas && (
-                  <Link
-                    href={montarUrl(basePath, searchParams, {
-                      pagina: pagina + 1,
-                    })}
-                    className="rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
-                  >
-                    Próxima
-                  </Link>
-                )}
+                {paginacao.pagina < paginacao.totalPaginas ? (
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={montarUrl(basePath, searchParams, {
+                        pagina: paginacao.pagina + 1,
+                      })}
+                    >
+                      Próxima
+                    </Link>
+                  </Button>
+                ) : null}
               </nav>
-            )}
+            ) : null}
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+function Chip({
+  href,
+  children,
+  ativo = false,
+}: {
+  href: string;
+  children: React.ReactNode;
+  ativo?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors",
+        ativo
+          ? "border-brand bg-brand text-on-brand hover:bg-brand-strong"
+          : "border-line bg-surface text-ink-soft hover:border-brand hover:text-brand",
+      ].join(" ")}
+      aria-label={`Remover filtro ${typeof children === "string" ? children : ""}`}
+    >
+      {children}
+      <X className="size-3.5" aria-hidden="true" />
+    </Link>
   );
 }

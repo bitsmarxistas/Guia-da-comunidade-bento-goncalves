@@ -4,10 +4,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
-  Users,
   Building2,
   Tag,
   FileText,
@@ -19,15 +18,24 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/ui/components/button";
+import { Simbolo } from "@/ui/components/brand/simbolo";
 
-const navigation = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+type NavItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  restrito?: boolean;
+};
+
+const navigation: NavItem[] = [
+  { name: "Visão geral", href: "/admin", icon: LayoutDashboard },
   { name: "Solicitações", href: "/admin/solicitacoes", icon: FileText },
-  { name: "Negócios", href: "/admin/negocios", icon: Building2 },
+  { name: "Comércios", href: "/admin/negocios", icon: Building2 },
   { name: "Categorias", href: "/admin/categorias", icon: Tag },
-  { name: "Fórum", href: "/admin/forum", icon: MessageSquare },
-  { name: "Votações", href: "/admin/votacoes", icon: Vote },
+  { name: "Fórum", href: "/admin/forum", icon: MessageSquare, restrito: true },
+  { name: "Votações", href: "/admin/votacoes", icon: Vote, restrito: true },
   { name: "Imagens", href: "/admin/imagens", icon: Image },
   { name: "Configurações", href: "/admin/configuracoes", icon: Settings },
 ];
@@ -39,115 +47,142 @@ export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-200",
+        "fixed top-0 left-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200",
         collapsed ? "w-16" : "w-64",
       )}
     >
-      <div className="flex h-full flex-col">
-        {/* Logo */}
-        <div
-          className={cn(
-            "flex items-center justify-between h-16 px-4 border-b border-gray-200",
-            collapsed && "justify-center",
-          )}
-        >
-          {!collapsed && (
-            <Link href="/admin" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">D</span>
-              </div>
-              <span className="font-semibold text-gray-900">Diretório</span>
-            </Link>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className={cn("h-8 w-8", collapsed && "mx-auto")}
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+      {/* Marca */}
+      <div
+        className={cn(
+          "flex h-16 items-center gap-2 border-b border-sidebar-border px-3",
+          collapsed ? "justify-center" : "justify-between",
+        )}
+      >
+        {!collapsed && (
+          <Link
+            href="/admin"
+            className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
+            aria-label="GuiaBG — painel administrativo"
           >
-            {collapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-
-        {/* Navigation */}
-        <nav
-          className="flex-1 p-4 space-y-1 overflow-y-auto"
-          aria-label="Menu principal"
-        >
-          <ul className="space-y-1" role="list">
-            {navigation.map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                      collapsed && "justify-center px-2",
-                    )}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <item.icon
-                      className="h-5 w-5 flex-shrink-0"
-                      aria-hidden="true"
-                    />
-                    {!collapsed && <span>{item.name}</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* User info & Logout */}
-        <div
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-on-brand">
+              <Simbolo className="h-5 w-auto" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+                Guia<span className="text-sidebar-ring">BG</span>
+              </span>
+              <span className="block text-[0.625rem] font-semibold tracking-[0.18em] text-sidebar-foreground/60 uppercase">
+                Admin
+              </span>
+            </span>
+          </Link>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "p-4 border-t border-gray-200",
-            collapsed && "items-center",
+            "h-10 w-10 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring",
+            collapsed && "mx-auto",
           )}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
         >
-          {!collapsed ? (
-            <div className="space-y-2">
-              <div className="px-3 py-2 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-900">
-                  {admin.nome}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{admin.email}</p>
-              </div>
-              <form action="/api/auth/logout" method="POST">
-                <Button
-                  type="submit"
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sair</span>
-                </Button>
-              </form>
-            </div>
+          {collapsed ? (
+            <ChevronRight className="h-5 w-5" />
           ) : (
+            <ChevronLeft className="h-5 w-5" />
+          )}
+        </Button>
+      </div>
+
+      {/* Navegação */}
+      <nav
+        className="flex-1 space-y-1 overflow-y-auto p-3"
+        aria-label="Menu principal"
+      >
+        <ul className="space-y-1" role="list">
+          {navigation.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <li key={item.name}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    collapsed && "justify-center px-2",
+                  )}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {isActive ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand"
+                    />
+                  ) : null}
+                  <item.icon
+                    className="h-5 w-5 flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                  {!collapsed && <span className="truncate">{item.name}</span>}
+                  {!collapsed && item.restrito ? (
+                    <span className="ml-auto rounded-full border border-sidebar-border px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase">
+                      restrito
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* Usuário e saída */}
+      <div
+        className={cn(
+          "border-t border-sidebar-border p-3",
+          collapsed && "flex justify-center",
+        )}
+      >
+        {!collapsed ? (
+          <div className="space-y-2">
+            <div className="rounded-lg bg-sidebar-accent px-3 py-2">
+              <p className="truncate text-sm font-medium text-sidebar-foreground">
+                {admin.nome}
+              </p>
+              <p className="truncate text-xs text-sidebar-foreground/60">
+                {admin.email}
+              </p>
+            </div>
             <form action="/api/auth/logout" method="POST">
               <Button
                 type="submit"
                 variant="ghost"
-                size="icon"
-                className="mx-auto"
-                aria-label="Sair"
+                size="sm"
+                className="h-10 w-full justify-start gap-2 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span>Sair</span>
               </Button>
             </form>
-          )}
-        </div>
+          </div>
+        ) : (
+          <form action="/api/auth/logout" method="POST">
+            <Button
+              type="submit"
+              variant="ghost"
+              size="icon"
+              className="mx-auto h-10 w-10 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-sidebar-ring"
+              aria-label="Sair"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </form>
+        )}
       </div>
     </aside>
   );

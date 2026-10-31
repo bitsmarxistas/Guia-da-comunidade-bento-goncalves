@@ -1,55 +1,60 @@
-// src/app/(admin)/forum/page.tsx
+// src/app/(admin)/admin/forum/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
 import { Button } from "@/ui/components/button";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
 export default async function ForumPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Fórum</h1>
-          <p className="text-gray-600">
-            Gerenciar publicações e discussões do fórum
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Fórum"
+        description="Gerenciar publicações e discussões do fórum. Área restrita à administração."
+        restrito
+      />
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Total de Publicações</CardTitle>
+            <CardTitle>Total de publicações</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Contestações Ativas</CardTitle>
+            <CardTitle>Contestações ativas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardHeader>
-            <CardTitle>Votações em Andamento</CardTitle>
+            <CardTitle>Votações em andamento</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">0</p>
+            <p className="text-3xl font-semibold text-ink tabular-nums">0</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Publicações Recentes</h2>
-          <Button variant="outline">Nova Publicação</Button>
+      <section aria-labelledby="publicacoes-recentes" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2
+            id="publicacoes-recentes"
+            className="text-lg font-semibold text-ink"
+          >
+            Publicações recentes
+          </h2>
+          <Button variant="outline" size="sm" className="h-10">
+            Nova publicação
+          </Button>
         </div>
-        <div className="border rounded-lg p-4 bg-gray-50 text-center text-gray-500">
+        <div className="rounded-xl border border-line bg-surface-2 p-6 text-center text-sm text-ink-mute">
           Nenhuma publicação encontrada
         </div>
-      </div>
+      </section>
     </div>
   );
 }

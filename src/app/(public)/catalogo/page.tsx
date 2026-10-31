@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import { CatalogoView } from "../_components/catalogo-view";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
-  title: "Catálogo de negócios | GuiaBG",
+  title: "Catálogo",
   description:
-    "Explore negócios, serviços e iniciativas de Bento Gonçalves por categoria e bairro.",
+    "Explore comércios e serviços de Bento Gonçalves por categoria e bairro.",
   alternates: { canonical: "/catalogo" },
 };
 
@@ -22,7 +20,7 @@ export default async function CatalogoPage({
       basePath="/catalogo"
       searchParams={params}
       titulo="Catálogo"
-      descricao="Negócios, serviços e iniciativas da nossa comunidade. Use a busca e os filtros para encontrar o que precisa."
+      descricao="Comércios e serviços da nossa comunidade. Use a busca e os filtros para encontrar o que precisa."
     />
   );
 }

@@ -1,4 +1,4 @@
-// src/app/(admin)/negocios/page.tsx
+// src/app/(admin)/admin/negocios/page.tsx
 import { listarNegociosAction } from "@/application/negocios/listar";
 import { Button } from "@/ui/components/button";
 import { Input } from "@/ui/components/input";
@@ -14,9 +14,10 @@ import {
   TableRow,
 } from "@/ui/components/table";
 import { Badge } from "@/ui/components/badge";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import {
+  AdminPageHeader,
   SITUACOES,
   SituacaoBadge,
 } from "@/app/(admin)/_components/admin-shared";
@@ -53,41 +54,41 @@ export default async function NegociosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Negócios</h1>
-          <p className="text-gray-600">Gerenciar negócios cadastrados</p>
-        </div>
-        <Link href="/admin/negocios/novo">
-          <Button>
-            <span className="mr-2">+</span>
-            Novo Negócio
-          </Button>
-        </Link>
-      </div>
+      <AdminPageHeader
+        title="Comércios"
+        description="Gerenciar os comércios cadastrados no GuiaBG."
+      >
+        <Button asChild size="sm" className="h-10">
+          <Link href="/admin/negocios/novo">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Novo comércio
+          </Link>
+        </Button>
+      </AdminPageHeader>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2 flex-1 min-w-[200px]">
+          <form className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  🔍
-                </span>
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-mute"
+                  aria-hidden="true"
+                />
                 <Input
                   id="busca"
                   name="busca"
-                  placeholder="Nome do negócio..."
+                  placeholder="Nome do comércio..."
                   value={params.busca || ""}
-                  className="pl-10"
+                  className="h-10 pl-10"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="situacao">Situação</Label>
               <NativeSelect
                 id="situacao"
@@ -102,21 +103,21 @@ export default async function NegociosPage({
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit">
-              <span className="mr-2">🔍</span>
+            <Button type="submit" size="sm" className="h-10">
+              <Search className="h-4 w-4" aria-hidden="true" />
               Filtrar
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Negócio</TableHead>
+                  <TableHead>Comércio</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead>Categorias</TableHead>
                   <TableHead>Data</TableHead>
@@ -128,9 +129,9 @@ export default async function NegociosPage({
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center py-8 text-gray-500"
+                      className="py-8 text-center text-ink-mute"
                     >
-                      Nenhum negócio encontrado
+                      Nenhum comércio encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -138,8 +139,8 @@ export default async function NegociosPage({
                     <TableRow key={neg.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{neg.nome}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="font-medium text-ink">{neg.nome}</p>
+                          <p className="text-sm text-ink-mute">
                             {neg.descricao?.substring(0, 100)}...
                           </p>
                         </div>
@@ -158,7 +159,7 @@ export default async function NegociosPage({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-ink-soft">
                         {new Date(neg.criadoEm).toLocaleDateString("pt-BR", {
                           day: "2-digit",
                           month: "2-digit",
@@ -168,7 +169,7 @@ export default async function NegociosPage({
                       <TableCell className="text-right">
                         <Link
                           href={`/admin/negocios/${neg.id}`}
-                          className="text-blue-600 hover:underline text-sm"
+                          className="inline-flex min-h-10 items-center text-sm font-medium text-brand transition-colors hover:text-brand-strong hover:underline"
                         >
                           Editar
                         </Link>
@@ -182,8 +183,8 @@ export default async function NegociosPage({
         </CardContent>
 
         {totalPaginas > 1 && (
-          <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4">
+            <p className="text-sm text-ink-soft">
               Mostrando {(pagina - 1) * 20 + 1} a {Math.min(pagina * 20, total)}{" "}
               de {total} resultados
             </p>
@@ -191,19 +192,19 @@ export default async function NegociosPage({
               {currentPagina > 1 && (
                 <Link
                   href={`/admin/negocios?pagina=${currentPagina - 1}${situacao ? `&situacao=${situacao}` : ""}${busca ? `&busca=${busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    Anterior
-                  </Button>
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  Anterior
                 </Link>
               )}
               {currentPagina < totalPaginas && (
                 <Link
                   href={`/admin/negocios?pagina=${currentPagina + 1}${situacao ? `&situacao=${situacao}` : ""}${busca ? `&busca=${busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    Próxima
-                  </Button>
+                  Próxima
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               )}
             </div>

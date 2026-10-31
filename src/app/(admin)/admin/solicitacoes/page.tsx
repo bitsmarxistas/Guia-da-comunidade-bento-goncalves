@@ -1,4 +1,4 @@
-// src/app/(admin)/solicitacoes/page.tsx
+// src/app/(admin)/admin/solicitacoes/page.tsx
 import { listarSolicitacoesAction } from "@/application/solicitacoes/listar";
 import { Button } from "@/ui/components/button";
 import { Input } from "@/ui/components/input";
@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/ui/components/badge";
 import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
 const SITUACOES = [
   { value: "recebida", label: "Recebida" },
@@ -30,27 +31,31 @@ const TIPOS = [
   { value: "atualizacao", label: "Atualização" },
 ] as const;
 
+const SITUACAO_CLASSES: Record<string, string> = {
+  recebida: "border-brand/20 bg-brand-tint text-brand-strong",
+  em_fila_contestacao: "border-warning/30 bg-warning-tint text-warning",
+  aprovada: "border-positive/30 bg-positive-tint text-positive",
+  reprovada: "border-critical/30 bg-critical-tint text-critical",
+  incompleta: "border-line bg-surface-2 text-ink-soft",
+};
+
+const SITUACAO_LABELS: Record<string, string> = {
+  recebida: "Recebida",
+  em_fila_contestacao: "Em fila",
+  aprovada: "Aprovada",
+  reprovada: "Reprovada",
+  incompleta: "Incompleta",
+};
+
 function SituacaoBadge({ situacao }: { situacao: string }) {
-  const variants: Record<
-    string,
-    "default" | "secondary" | "destructive" | "outline"
-  > = {
-    recebida: "default",
-    em_fila_contestacao: "secondary",
-    aprovada: "default",
-    reprovada: "destructive",
-    incompleta: "outline",
-  };
-  const labels: Record<string, string> = {
-    recebida: "Recebida",
-    em_fila_contestacao: "Em fila",
-    aprovada: "Aprovada",
-    reprovada: "Reprovada",
-    incompleta: "Incompleta",
-  };
   return (
-    <Badge variant={variants[situacao] || "default"}>
-      {labels[situacao] || situacao}
+    <Badge
+      variant="outline"
+      className={
+        SITUACAO_CLASSES[situacao] ?? "border-line bg-surface-2 text-ink-soft"
+      }
+    >
+      {SITUACAO_LABELS[situacao] || situacao}
     </Badge>
   );
 }
@@ -82,11 +87,16 @@ export default async function SolicitacoesPage({
 
   if ("error" in result) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-700">
-            Erro ao carregar solicitações: {result.error}
-          </p>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Solicitações"
+          description="Gerenciar solicitações de inclusão e atualização."
+        />
+        <div
+          role="alert"
+          className="rounded-xl border border-critical/30 bg-critical-tint p-4 text-sm text-critical"
+        >
+          Erro ao carregar solicitações: {result.error}
         </div>
       </div>
     );
@@ -102,35 +112,34 @@ export default async function SolicitacoesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Solicitações</h1>
-          <p className="text-gray-600">
-            Gerenciar solicitações de inclusão e atualização
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Solicitações"
+        description="Gerenciar solicitações de inclusão e atualização."
+      />
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2 flex-1 min-w-[200px]">
+          <form className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-mute"
+                  aria-hidden="true"
+                />
                 <Input
                   id="busca"
                   name="busca"
                   placeholder="Nome do negócio..."
                   value={busca || ""}
-                  className="pl-10"
+                  className="h-10 pl-10"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="situacao">Situação</Label>
               <NativeSelect
                 id="situacao"
@@ -145,7 +154,7 @@ export default async function SolicitacoesPage({
                 ))}
               </NativeSelect>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="tipo">Tipo</Label>
               <NativeSelect id="tipo" name="tipo" value={tipo || ""}>
                 <option value="">Todos</option>
@@ -156,15 +165,15 @@ export default async function SolicitacoesPage({
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit">
-              <Filter className="h-4 w-4 mr-2" />
+            <Button type="submit" size="sm" className="h-10">
+              <Filter className="h-4 w-4" aria-hidden="true" />
               Filtrar
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -183,7 +192,7 @@ export default async function SolicitacoesPage({
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      className="text-center py-8 text-gray-500"
+                      className="py-8 text-center text-ink-mute"
                     >
                       Nenhuma solicitação encontrada
                     </TableCell>
@@ -193,10 +202,10 @@ export default async function SolicitacoesPage({
                     <TableRow key={sol.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">
+                          <p className="font-medium text-ink">
                             {sol.dadosNegocioProposto?.nome || "N/A"}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-ink-mute">
                             {sol.tipo === "inclusao"
                               ? "Inclusão"
                               : "Atualização"}
@@ -205,10 +214,10 @@ export default async function SolicitacoesPage({
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">
+                          <p className="font-medium text-ink">
                             {sol.solicitante?.nome || "N/A"}
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-ink-mute">
                             {sol.solicitante?.email || ""}
                           </p>
                         </div>
@@ -221,7 +230,7 @@ export default async function SolicitacoesPage({
                       <TableCell>
                         <SituacaoBadge situacao={sol.situacao} />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-ink-soft">
                         {new Date(sol.criadoEm).toLocaleDateString("pt-BR", {
                           day: "2-digit",
                           month: "2-digit",
@@ -233,7 +242,7 @@ export default async function SolicitacoesPage({
                       <TableCell className="text-right">
                         <Link
                           href={`/admin/solicitacoes/${sol.id}`}
-                          className="text-blue-600 hover:underline text-sm"
+                          className="inline-flex min-h-10 items-center text-sm font-medium text-brand transition-colors hover:text-brand-strong hover:underline"
                         >
                           Ver detalhes
                         </Link>
@@ -247,8 +256,8 @@ export default async function SolicitacoesPage({
         </CardContent>
 
         {totalPaginas > 1 && (
-          <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4">
+            <p className="text-sm text-ink-soft">
               Mostrando {(currentPagina - 1) * porPagina + 1} a{" "}
               {Math.min(currentPagina * porPagina, total)} de {total} resultados
             </p>
@@ -256,21 +265,19 @@ export default async function SolicitacoesPage({
               {currentPagina > 1 && (
                 <Link
                   href={`/admin/solicitacoes?pagina=${currentPagina - 1}${situacao ? `&situacao=${situacao}` : ""}${tipo ? `&tipo=${tipo}` : ""}${busca ? `&busca=${busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Anterior
-                  </Button>
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  Anterior
                 </Link>
               )}
               {currentPagina < totalPaginas && (
                 <Link
                   href={`/admin/solicitacoes?pagina=${currentPagina + 1}${situacao ? `&situacao=${situacao}` : ""}${tipo ? `&tipo=${tipo}` : ""}${busca ? `&busca=${busca}` : ""}`}
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 >
-                  <Button variant="outline" size="sm">
-                    Próxima
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+                  Próxima
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               )}
             </div>
