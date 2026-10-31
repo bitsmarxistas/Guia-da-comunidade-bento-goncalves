@@ -51,7 +51,7 @@ export async function enviarEmailRecuperacaoSenha(
   );
   return enviarEmail({
     to: email,
-    subject: "Redefinir sua senha - Diretório Comunitário",
+    subject: "Redefinir sua senha - GuiaBG",
     html,
     text,
   });
@@ -68,7 +68,7 @@ export async function enviarEmailSugestaoCategoria(
   );
   return enviarEmail({
     to: email,
-    subject: `Sua sugestão de categoria foi ${aceita ? "aceita" : "rejeitada"} - Diretório Comunitário`,
+    subject: `Sua sugestão de categoria foi ${aceita ? "aceita" : "rejeitada"} - GuiaBG`,
     html,
     text,
   });
@@ -85,7 +85,7 @@ export async function enviarEmailCorrecaoDados(
   );
   return enviarEmail({
     to: email,
-    subject: "Correção de dados necessária - Diretório Comunitário",
+    subject: "Correção de dados necessária - GuiaBG",
     html,
     text,
   });
@@ -109,7 +109,7 @@ export async function enviarEmailAnaliseSolicitacao(
   );
   return enviarEmail({
     to: email,
-    subject: `Sua solicitação foi ${decisao === "aprovar" ? "aprovada" : decisao === "reprovar" ? "reprovada" : "solicitada correção"} - Diretório Comunitário`,
+    subject: `Sua solicitação foi ${decisao === "aprovar" ? "aprovada" : decisao === "reprovar" ? "reprovada" : "solicitada correção"} - GuiaBG`,
     html,
     text,
   });

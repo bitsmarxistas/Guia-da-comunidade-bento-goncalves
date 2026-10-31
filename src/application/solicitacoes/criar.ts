@@ -15,6 +15,8 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
 import { logSolicitacaoRecebida } from "@/infrastructure/db/schema/logs";
+import { protocoloDaSolicitacao } from "@/domain/solicitacoes/protocolo";
+import { notificarSolicitacaoRecebida } from "@/infrastructure/email/participacao";
 import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
 
 /*
@@ -231,10 +233,24 @@ export async function criarSolicitacaoAction(
   // TODO: Detectar se negócio relacionado está em oculto_contestacao e criar em em_fila_contestacao
   // (seria necessário verificar negocioId vinculado, mas na inclusão não há vínculo prévio)
 
+  /*
+   * Confirmação por e-mail: antes não existia e-mail nenhum neste ponto — quem
+   * enviava a inclusão só recebia algo quando um admin decidia (e às vezes
+   * nunca). Se o envio falhar, a solicitação continua criada.
+   */
+  await notificarSolicitacaoRecebida({
+    emailSolicitante: data.email.toLowerCase().trim(),
+    nomeSolicitante: data.nomeSolicitante.trim(),
+    nomeNegocio: data.nomeNegocio.trim(),
+    protocolo: protocoloDaSolicitacao(resultado.solicitacao.id),
+    tipo: "inclusao",
+  });
+
   return {
     success: true,
     solicitacao: resultado.solicitacao,
     duplicataDetectada: resultado.duplicataDetectada,
+    protocolo: protocoloDaSolicitacao(resultado.solicitacao.id),
   };
 }
 

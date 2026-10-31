@@ -22,6 +22,7 @@ import {
   type AlteracaoCampo,
 } from "@/domain/solicitacoes/alteracoes";
 import { protocoloDaSolicitacao } from "@/domain/solicitacoes/protocolo";
+import { notificarSolicitacaoRecebida } from "@/infrastructure/email/participacao";
 import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
 import {
   logSolicitacaoRecebida,
@@ -362,11 +363,27 @@ export async function criarSolicitacaoAtualizacaoAction(
     return { solicitacao: novaSolicitacao, duplicataDetectada: false };
   });
 
+  const protocolo = protocoloDaSolicitacao(resultado.solicitacao.id);
+
+  // Mesma confirmação da inclusão: chamado não pode ficar sem resposta.
+  await notificarSolicitacaoRecebida({
+    emailSolicitante: data.email.toLowerCase().trim(),
+    nomeSolicitante: data.nomeSolicitante.trim(),
+    nomeNegocio: data.nomeNegocio.trim(),
+    protocolo,
+    tipo: "atualizacao",
+    alteracoes: alteracoes.map((a) => ({
+      rotulo: a.rotulo,
+      de: a.de,
+      para: a.para,
+    })),
+  });
+
   return {
     success: true,
     solicitacao: resultado.solicitacao,
     duplicataDetectada: resultado.duplicataDetectada,
-    protocolo: protocoloDaSolicitacao(resultado.solicitacao.id),
+    protocolo,
     slug: slugDoNegocio,
     alteracoes,
   };
