@@ -10,7 +10,8 @@ import {
   horarioFuncionamento,
   negocioCategoria,
 } from "@/infrastructure/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
 import { gerarSlugUnico } from "@/domain/utils/gerar-slug-unico";
 import { normalizarSlug } from "@/domain/utils/normalizar-slug";
 import { logNegocio } from "@/infrastructure/db/schema/logs";
@@ -110,7 +111,7 @@ export async function criarNegocioAction(
     .replace(/[\u0300-\u036f]/g, "");
   const existente = await db.query.negocio.findFirst({
     where: (n, { eq, sql }) =>
-      sql`lower(unaccent(${n.nome})) = ${nomeNormalizado}`,
+      sql`${colunaNormalizada(n.nome)} = ${nomeNormalizado}`,
   });
 
   if (existente) {

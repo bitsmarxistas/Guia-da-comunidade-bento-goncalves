@@ -11,6 +11,7 @@ import {
   negocioCategoria,
 } from "@/infrastructure/db/schema";
 import { eq, desc, asc, ilike, or, and, sql, count } from "drizzle-orm";
+import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
 
 interface ListarNegociosParams {
   pagina?: number;
@@ -119,7 +120,7 @@ export async function detectarDuplicataNegocio(
   // Buscar por nome similar
   const similares = await db.query.negocio.findMany({
     where: (n, { sql }) =>
-      sql`lower(unaccent(${n.nome})) ILIKE ${"%" + nomeNormalizado + "%"}`,
+      sql`${colunaNormalizada(n.nome)} LIKE ${"%" + nomeNormalizado + "%"}`,
     limit: 5,
   });
 

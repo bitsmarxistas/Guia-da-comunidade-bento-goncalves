@@ -183,16 +183,26 @@ export async function analisarSolicitacaoAction(
             descricao: alvo.descricao,
           };
 
+          // Só sobrescreve o que o chamado realmente pediu para mudar.
           await tx
             .update(negocio)
             .set({
-              nome: (dados.nome as string) ?? alvo.nome,
-              descricao: (dados.descricao as string) ?? alvo.descricao,
+              nome: (dados.nome as string) || alvo.nome,
+              descricao: (dados.descricao as string) || alvo.descricao,
               atualizadoEm: new Date(),
             })
             .where(eq(negocio.id, alvo.id));
 
-          await tx.delete(contato).where(eq(contato.negocioId, alvo.id));
+          const contatosDoChamado =
+            (dados.contatos as Array<{
+              tipo: string;
+              valor: string;
+              ordem: number;
+            }>) ?? [];
+
+          if (contatosDoChamado.length > 0) {
+            await tx.delete(contato).where(eq(contato.negocioId, alvo.id));
+          }
           for (const c of (dados.contatos as Array<{
             tipo: string;
             valor: string;
@@ -206,32 +216,67 @@ export async function analisarSolicitacaoAction(
             });
           }
 
-          await tx
-            .delete(localizacao)
-            .where(eq(localizacao.negocioId, alvo.id));
+          /*
+           * Localização: mescla em vez de substituir.
+           * O chamado de correção manda só rua e bairro; recriar a linha
+           * zerava CEP, número, "sem ponto comercial" e as coordenadas do
+           * mapa já geocodificadas.
+           */
           if (dados.localizacao) {
-            await tx.insert(localizacao).values({
-              negocioId: alvo.id,
-              ...valoresLocalizacao(dados.localizacao as LocalizacaoProposta),
-            });
+            const valores = valoresLocalizacao(
+              dados.localizacao as LocalizacaoProposta,
+            );
+            const [existente] = await tx
+              .select({ id: localizacao.id })
+              .from(localizacao)
+              .where(eq(localizacao.negocioId, alvo.id))
+              .limit(1);
+
+            if (existente) {
+              await tx
+                .update(localizacao)
+                .set({
+                  endereco: valores.endereco,
+                  bairro: valores.bairro,
+                  areaAtendimento: valores.areaAtendimento,
+                  cep: valores.cep,
+                  numero: valores.numero,
+                  semPontoComercial: valores.semPontoComercial,
+                  latitude: valores.latitude,
+                  longitude: valores.longitude,
+                })
+                .where(eq(localizacao.id, existente.id));
+            } else {
+              await tx.insert(localizacao).values({
+                negocioId: alvo.id,
+                ...valores,
+              });
+            }
           }
 
-          await tx
-            .delete(horarioFuncionamento)
-            .where(eq(horarioFuncionamento.negocioId, alvo.id));
-          for (const h of (dados.horarios as Array<{
-            diaSemana: number;
-            horaAbertura: string;
-            horaFechamento: string;
-            observacao?: string;
-          }>) ?? []) {
-            await tx.insert(horarioFuncionamento).values({
-              negocioId: alvo.id,
-              diaSemana: h.diaSemana,
-              horaAbertura: h.horaAbertura,
-              horaFechamento: h.horaFechamento,
-              observacao: h.observacao,
-            });
+          /*
+           * Horário só é tocado quando o chamado trouxe horários.
+           * O formulário de correção não envia horários: antes, aprovar
+           * "troque o telefone" apagava todo o horário de funcionamento.
+           */
+          if (Array.isArray(dados.horarios)) {
+            await tx
+              .delete(horarioFuncionamento)
+              .where(eq(horarioFuncionamento.negocioId, alvo.id));
+            for (const h of dados.horarios as Array<{
+              diaSemana: number;
+              horaAbertura: string;
+              horaFechamento: string;
+              observacao?: string;
+            }>) {
+              await tx.insert(horarioFuncionamento).values({
+                negocioId: alvo.id,
+                diaSemana: h.diaSemana,
+                horaAbertura: h.horaAbertura,
+                horaFechamento: h.horaFechamento,
+                observacao: h.observacao,
+              });
+            }
           }
 
           await tx

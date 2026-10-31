@@ -11,15 +11,32 @@ import {
   documentoTermo,
   negocio,
   contato,
+  categoria,
 } from "@/infrastructure/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
 import { appendLog } from "@/infrastructure/audit/audit.service";
 import { contextoDaRequisicao } from "@/lib/audit-context";
 import {
+  calcularAlteracoes,
+  type AlteracaoCampo,
+} from "@/domain/solicitacoes/alteracoes";
+import { protocoloDaSolicitacao } from "@/domain/solicitacoes/protocolo";
+import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
+import {
   logSolicitacaoRecebida,
   logVinculacaoSolicitacao,
 } from "@/infrastructure/db/schema/logs";
+
+/** Nomes das categorias escolhidas — o diff fala em nome, não em UUID. */
+async function nomesDasCategorias(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const linhas = await db
+    .select({ nome: categoria.nome })
+    .from(categoria)
+    .where(inArray(categoria.id, ids));
+  return linhas.map((linha) => linha.nome);
+}
 
 const TelefoneOpcional = z
   .string()
@@ -42,6 +59,12 @@ const atualizarSolicitacaoSchema = z.object({
   // Dados do negócio
   nomeNegocio: z.string().min(1, "Informe o nome do comércio.").max(150),
   descricao: z.string().min(1, "Descreva o comércio."),
+  /*
+   * Contatos são OPCIONAIS no chamado de correção: o formulário só mostra o
+   * WhatsApp atual como referência. Quando não vêm, a aprovação preserva os
+   * contatos publicados (antes ela apagava telefone, e-mail e Instagram e
+   * deixava só o WhatsApp).
+   */
   contatos: z
     .array(
       z.object({
@@ -50,7 +73,8 @@ const atualizarSolicitacaoSchema = z.object({
         ordem: z.number().default(0),
       }),
     )
-    .min(1, "Informe ao menos um contato do comércio."),
+    .min(1, "Informe ao menos um contato do comércio.")
+    .optional(),
   categoriasIds: z.array(z.string().uuid()).optional(),
   sugestaoCategoria: z.string().max(150).optional(),
   localizacao: z
@@ -101,9 +125,10 @@ export async function criarSolicitacaoAtualizacaoAction(
     telefone: formData.get("telefone"),
     nomeNegocio: formData.get("nomeNegocio"),
     descricao: formData.get("descricao"),
+    // Ausente = "não mexe nos contatos" (o formulário de correção não os envia).
     contatos: formData.get("contatos")
       ? JSON.parse(formData.get("contatos") as string)
-      : [],
+      : undefined,
     categoriasIds:
       formData.getAll("categoriasIds").length > 0
         ? formData.getAll("categoriasIds").map((id) => id as string)
@@ -131,13 +156,66 @@ export async function criarSolicitacaoAtualizacaoAction(
 
   const data = parseResult.data;
 
+  /*
+   * O chamado de correção nasce da diferença entre a ficha publicada e o que
+   * a pessoa enviou. A lista de alterações é gravada dentro do chamado: é ela
+   * que a equipe aprova no painel — nada é aplicado direto no comércio.
+   */
+  let alteracoes: AlteracaoCampo[] = [];
+  let slugDoNegocio: string | null = null;
+
   if (data.negocioId) {
     const alvo = await db.query.negocio.findFirst({
       where: (n, { eq }) => eq(n.id, data.negocioId as string),
-      columns: { id: true, nome: true },
+      columns: { id: true, nome: true, descricao: true, slug: true },
+      with: {
+        contatos: true,
+        localizacao: true,
+        categorias: { with: { categoria: true } },
+      },
     });
+
     if (!alvo) {
       return { error: "O comércio que você quer corrigir não existe mais." };
+    }
+
+    slugDoNegocio = alvo.slug;
+
+    const whatsappAtual =
+      alvo.contatos.find((c) => c.tipo === "whatsapp")?.valor ?? "";
+    const categoriasAtuais = alvo.categorias.map((c) => c.categoria.nome);
+
+    alteracoes = calcularAlteracoes(
+      {
+        nome: alvo.nome,
+        descricao: alvo.descricao,
+        whatsapp: whatsappAtual,
+        bairro: alvo.localizacao?.bairro ?? "",
+        endereco: alvo.localizacao?.endereco ?? "",
+        categorias: categoriasAtuais,
+      },
+      {
+        nome: data.nomeNegocio,
+        descricao: data.descricao,
+        // Campos que o formulário não enviou ficam como estão: o chamado não
+        // pode "mudar" algo que a pessoa nem viu na tela.
+        whatsapp: data.contatos
+          ? (data.contatos.find((c) => c.tipo === "whatsapp")?.valor ?? "")
+          : whatsappAtual,
+        bairro: data.localizacao?.bairro ?? alvo.localizacao?.bairro ?? "",
+        endereco:
+          data.localizacao?.endereco ?? alvo.localizacao?.endereco ?? "",
+        categorias: data.categoriasIds
+          ? await nomesDasCategorias(data.categoriasIds)
+          : categoriasAtuais,
+      },
+    );
+
+    if (alteracoes.length === 0) {
+      return {
+        error:
+          "Nenhuma informação mudou em relação à ficha publicada. Ajuste o campo que está errado para abrir o chamado.",
+      };
     }
   }
 
@@ -147,16 +225,25 @@ export async function criarSolicitacaoAtualizacaoAction(
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+  /*
+   * Checagem de duplicata é só um alerta. Quando o chamado não trouxe
+   * contato (caso típico da correção), não há telefone para comparar —
+   * mandar um texto sentinela para o ILIKE quebra com erro de codificação
+   * no Postgres (22021).
+   */
+  const contatoDoChamado = data.contatos?.[0]?.valor.replace(/\D/g, "");
   const [duplicataNome, duplicataContato] = await Promise.all([
     db.query.negocio.findFirst({
       where: (n, { sql }) =>
-        sql`lower(unaccent(${negocio.nome})) = ${nomeNormalizado}`,
+        sql`${colunaNormalizada(negocio.nome)} = ${nomeNormalizado}`,
     }),
-    db.query.contato.findFirst({
-      where: (c, { sql }) =>
-        sql`${contato.valor} ILIKE ${"%" + data.contatos[0]?.valor.replace(/\D/g, "") + "%"}`,
-      with: { negocio: true },
-    }),
+    contatoDoChamado
+      ? db.query.contato.findFirst({
+          where: (c, { sql }) =>
+            sql`${contato.valor} ILIKE ${"%" + contatoDoChamado + "%"}`,
+          with: { negocio: true },
+        })
+      : Promise.resolve(undefined),
   ]);
 
   const duplicataDetectada = !!duplicataNome || !!duplicataContato;
@@ -194,11 +281,19 @@ export async function criarSolicitacaoAtualizacaoAction(
     const dadosNegocioProposto = {
       nome: data.nomeNegocio.trim(),
       descricao: data.descricao.trim(),
-      contatos: data.contatos,
-      localizacao: data.localizacao,
-      horarios: data.horarios,
+      // Contatos/lugares só entram no snapshot quando foram enviados; a
+      // aprovação usa a ausência para saber que não deve mexer neles.
+      ...(data.contatos ? { contatos: data.contatos } : {}),
+      ...(data.localizacao ? { localizacao: data.localizacao } : {}),
+      // Só grava horários se o chamado realmente os trouxe: a aprovação não
+      // pode apagar o horário publicado por omissão do formulário.
+      ...(data.horarios && data.horarios.length > 0
+        ? { horarios: data.horarios }
+        : {}),
       categoriasIds: data.categoriasIds,
       sugestaoCategoria: data.sugestaoCategoria,
+      // A lista do que muda é o corpo do chamado que a equipe aprova.
+      alteracoes,
     };
 
     // Verificar se há negócio em oculto_contestacao para lógica de em_fila_contestacao
@@ -271,5 +366,8 @@ export async function criarSolicitacaoAtualizacaoAction(
     success: true,
     solicitacao: resultado.solicitacao,
     duplicataDetectada: resultado.duplicataDetectada,
+    protocolo: protocoloDaSolicitacao(resultado.solicitacao.id),
+    slug: slugDoNegocio,
+    alteracoes,
   };
 }

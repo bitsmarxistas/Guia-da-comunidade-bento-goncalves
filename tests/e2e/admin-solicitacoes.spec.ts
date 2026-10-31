@@ -100,4 +100,30 @@ test.describe("painel de solicitações", () => {
 
     await expect(page).toHaveURL(new RegExp(`categoria=${valor}`));
   });
+
+  test("pedido de correção abre chamado com protocolo e não altera a ficha", async ({
+    page,
+  }) => {
+    // Marcador único: prova que o texto enviado NÃO foi aplicado na ficha.
+    const marcador = `correcao-e2e-${Date.now()}`;
+
+    await page.goto("/negocio/padaria-do-ze/correcao");
+    await page.getByLabel(/Seu nome/i).fill("Solicitante E2E");
+    await page.getByLabel(/^E-mail/i).fill("solicitante-e2e@exemplo.local");
+    await page.getByLabel(/^Telefone/i).fill("(54) 99999-0000");
+    await page.getByLabel(/Descrição/i).fill(`Descrição ${marcador} da ficha.`);
+    await page.getByRole("button", { name: /Enviar correção/i }).click();
+
+    await expect(
+      page.getByRole("heading", { name: /Chamado de correção aberto/i }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Protocolo\s+[A-F0-9]{8}/)).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /Como deve ficar/i }),
+    ).toBeVisible();
+
+    // Nada foi aplicado: a ficha pública continua com o texto anterior.
+    await page.goto("/negocio/padaria-do-ze");
+    await expect(page.getByText(marcador)).toHaveCount(0);
+  });
 });

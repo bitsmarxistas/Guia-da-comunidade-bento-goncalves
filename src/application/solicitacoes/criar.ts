@@ -15,6 +15,7 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
 import { logSolicitacaoRecebida } from "@/infrastructure/db/schema/logs";
+import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
 
 /*
  * Mensagens em português, uma por campo.
@@ -250,7 +251,7 @@ export async function detectarDuplicataPublica(
   const [porNome, porContato] = await Promise.all([
     db.query.negocio.findMany({
       where: (n, { sql }) =>
-        sql`lower(unaccent(${negocio.nome})) ILIKE ${"%" + nomeNormalizado + "%"}`,
+        sql`${colunaNormalizada(negocio.nome)} LIKE ${"%" + nomeNormalizado + "%"}`,
       limit: 5,
     }),
     db.query.contato.findMany({

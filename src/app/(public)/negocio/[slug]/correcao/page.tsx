@@ -52,9 +52,9 @@ export default async function CorrecaoPage({
             Corrigir dados de {negocio.nome}
           </h1>
           <p className="mt-3 text-ink-soft">
-            Preencha os dados corretos. A correção é analisada pela equipe e só
-            aparece no guia depois de aprovada — em até 24 h, com resposta por
-            e-mail.
+            Você abre um chamado com as informações corretas. A equipe recebe,
+            confere e aprova no painel — em até 24 h, com resposta por e-mail. A
+            ficha continua como está até a aprovação.
           </p>
         </header>
 
@@ -62,6 +62,7 @@ export default async function CorrecaoPage({
           <CorrecaoForm
             dados={{
               negocioId: negocio.id,
+              slug: negocio.slug,
               nome: negocio.nome,
               descricao: negocio.descricao,
               whatsapp,

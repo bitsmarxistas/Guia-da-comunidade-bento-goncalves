@@ -37,8 +37,13 @@ const SITUACOES = SITUACOES_SOLICITACAO.map((valor) => ({
 
 const TIPOS = [
   { value: "inclusao", label: "Inclusão" },
-  { value: "atualizacao", label: "Atualização" },
+  // "atualizacao" é o chamado de correção aberto pelo formulário público.
+  { value: "atualizacao", label: "Correção" },
 ] as const;
+
+function rotuloTipo(tipo: string): string {
+  return tipo === "atualizacao" ? "Correção" : "Inclusão";
+}
 
 function SituacaoBadge({ situacao }: { situacao: string }) {
   return (
@@ -210,7 +215,7 @@ export default async function SolicitacoesPage({
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {sol.tipo === "inclusao" ? "Inclusão" : "Atualização"}
+                          {rotuloTipo(sol.tipo)}
                         </Badge>
                       </TableCell>
                       <TableCell>

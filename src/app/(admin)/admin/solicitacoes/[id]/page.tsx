@@ -57,11 +57,19 @@ interface DadosNegocioProposto {
   }>;
   categoriasIds?: string[];
   sugestaoCategoria?: string;
+  /** A lista do que muda — o corpo do chamado de correção. */
+  alteracoes?: Array<{
+    campo: string;
+    rotulo: string;
+    de: string;
+    para: string;
+  }>;
 }
 
 const TIPO_LABELS: Record<string, string> = {
   inclusao: "Inclusão",
-  atualizacao: "Atualização",
+  // Chamado de correção: aponta para um comércio existente e pede mudanças.
+  atualizacao: "Chamado de correção",
 };
 
 const DECISAO_OPTIONS = [
@@ -140,6 +148,64 @@ export default async function SolicitacaoDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {/*
+            Chamado de correção: a equipe aprova o que está listado aqui.
+            Sem esta tabela o admin teria de comparar com a ficha no site.
+          */}
+          {dados.alteracoes && dados.alteracoes.length > 0 ? (
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Alterações pedidas</CardTitle>
+                <CardDescription>
+                  Aprovar aplica exatamente estes campos na ficha publicada.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <caption className="sr-only">
+                      Campos que o chamado pede para alterar
+                    </caption>
+                    <thead className="bg-surface-2 text-xs tracking-[0.08em] text-ink-soft uppercase">
+                      <tr>
+                        <th scope="col" className="px-4 py-2 font-semibold">
+                          Campo
+                        </th>
+                        <th scope="col" className="px-4 py-2 font-semibold">
+                          Publicado
+                        </th>
+                        <th scope="col" className="px-4 py-2 font-semibold">
+                          Pedido
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dados.alteracoes.map((alteracao) => (
+                        <tr
+                          key={alteracao.campo}
+                          className="border-t border-line align-top"
+                        >
+                          <th
+                            scope="row"
+                            className="px-4 py-3 font-medium text-ink"
+                          >
+                            {alteracao.rotulo}
+                          </th>
+                          <td className="px-4 py-3 text-ink-mute line-through">
+                            {alteracao.de || "—"}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-ink">
+                            {alteracao.para || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card size="sm">
             <CardHeader>
               <CardTitle>Dados do Negócio</CardTitle>

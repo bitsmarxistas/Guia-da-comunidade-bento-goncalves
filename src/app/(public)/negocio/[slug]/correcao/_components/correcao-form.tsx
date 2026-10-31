@@ -13,10 +13,18 @@ type Estado = {
   success?: boolean;
   error?: string | null;
   protocolo?: string | null;
+  slug?: string | null;
+  alteracoes?: Array<{
+    campo: string;
+    rotulo: string;
+    de: string;
+    para: string;
+  }>;
 };
 
 export interface CorrecaoDados {
   negocioId: string;
+  slug: string;
   nome: string;
   descricao: string;
   whatsapp: string;
@@ -39,7 +47,13 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
       if ("error" in resultado && resultado.error) {
         return { success: false, error: String(resultado.error) };
       }
-      return { success: true, error: null };
+      return {
+        success: true,
+        error: null,
+        protocolo: "protocolo" in resultado ? resultado.protocolo : null,
+        slug: "slug" in resultado ? resultado.slug : null,
+        alteracoes: "alteracoes" in resultado ? resultado.alteracoes : [],
+      };
     },
     { success: false, error: null },
   );
@@ -50,26 +64,94 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
 
   if (estado.success) {
     return (
-      <div className="mx-auto max-w-md rounded-[22px] border border-line bg-surface p-6 text-center">
-        <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand text-on-brand">
-          <CheckCircle className="size-7" aria-hidden="true" />
-        </span>
-        <h2 className="mt-4 font-[family-name:var(--font-fraunces)] text-2xl font-semibold">
-          Correção enviada
-        </h2>
-        <p className="mt-2 text-ink-soft">
-          Recebemos a correção de {dados.nome}. Ela passa pela análise e a
-          resposta chega no e-mail informado em até 24 h.
-        </p>
-        <Button asChild className="mt-6 w-full">
-          <Link href={`/negocio/`}>Voltar ao guia</Link>
-        </Button>
+      <div className="mx-auto max-w-xl rounded-[22px] border border-line bg-surface p-6">
+        <div className="text-center">
+          <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand text-on-brand">
+            <CheckCircle className="size-7" aria-hidden="true" />
+          </span>
+          <h2 className="mt-4 font-[family-name:var(--font-fraunces)] text-2xl font-semibold">
+            Chamado de correção aberto
+          </h2>
+          {estado.protocolo ? (
+            <p className="mt-2 text-sm text-ink-soft">
+              Protocolo{" "}
+              <strong className="font-mono text-ink">{estado.protocolo}</strong>{" "}
+              — guarde este número.
+            </p>
+          ) : null}
+          <p className="mt-2 text-ink-soft">
+            A ficha de {dados.nome} <strong>não mudou</strong>. A equipe recebeu
+            as informações abaixo, confere e publica a correção. A resposta
+            chega no e-mail informado em até 24 h.
+          </p>
+        </div>
+
+        {estado.alteracoes && estado.alteracoes.length > 0 ? (
+          <div className="mt-5 overflow-hidden rounded-[14px] border border-line">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">
+                Campos enviados para aprovação
+              </caption>
+              <thead className="bg-surface-2 text-xs uppercase tracking-[0.08em] text-ink-soft">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-semibold">
+                    Campo
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-semibold">
+                    Como está hoje
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-semibold">
+                    Como deve ficar
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {estado.alteracoes.map((alteracao) => (
+                  <tr
+                    key={alteracao.campo}
+                    className="border-t border-line align-top"
+                  >
+                    <th scope="row" className="px-3 py-2 font-medium text-ink">
+                      {alteracao.rotulo}
+                    </th>
+                    <td className="px-3 py-2 text-ink-mute line-through">
+                      {alteracao.de || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-ink">
+                      {alteracao.para || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+          <Button asChild className="flex-1">
+            <Link href={`/negocio/${estado.slug ?? dados.slug}`}>
+              Voltar para a ficha
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="flex-1">
+            <Link href="/catalogo">Ver o catálogo</Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <form action={acao} className="space-y-5">
+      {/* Aviso explícito: isto abre chamado, não edita a ficha. */}
+      <div className="rounded-[14px] border border-brand/30 bg-brand-tint px-4 py-3 text-sm text-ink">
+        <p className="font-semibold">Isto abre um chamado para a equipe</p>
+        <p className="mt-1 text-ink-soft">
+          Nada é alterado na ficha agora. O que você preencher aqui vai para a
+          fila de aprovação do painel e só aparece no guia depois de aprovado.
+          Preencha apenas o que está errado — o resto fica como está.
+        </p>
+      </div>
       <input type="hidden" name="negocioId" value={dados.negocioId} />
       <input
         type="hidden"
@@ -80,13 +162,11 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
       {selecionadas.map((id) => (
         <input key={id} type="hidden" name="categoriasIds" value={id} />
       ))}
-      <input
-        type="hidden"
-        name="contatos"
-        value={JSON.stringify([
-          { tipo: "whatsapp", valor: dados.whatsapp, ordem: 0 },
-        ])}
-      />
+      {/*
+        Contatos NÃO são enviados: o formulário só mostra o WhatsApp atual como
+        referência. Enviar a lista aqui fazia a aprovação apagar telefone,
+        e-mail e Instagram da ficha.
+      */}
       <input
         type="hidden"
         name="localizacao"
