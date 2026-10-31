@@ -7,36 +7,31 @@ import { Button } from "@/ui/components/button";
 /**
  * Alternador de tema.
  *
- * `resolvedTheme` é `undefined` até o cliente montar; usar isso como sinal de
- * "montado" evita divergência de hidratação sem um segundo estado sincronizado
- * por efeito (que dispara render em cascata).
+ * O ícone certo é escolhido por CSS a partir de `[data-theme]` no <html>, e a
+ * direção do clique vem do próprio DOM. Isso evita dois problemas que já
+ * apareceram aqui: divergência de hidratação (servidor não sabe o tema) e
+ * `resolvedTheme` indefinido, que deixava o ícone errado para sempre.
  */
 export function ThemeToggle({ className }: { className?: string }) {
-  const { resolvedTheme, setTheme } = useTheme();
-  const montado = resolvedTheme !== undefined;
-  const escuro = montado && resolvedTheme === "dark";
+  const { setTheme } = useTheme();
 
-  const rotulo = !montado
-    ? "Alternar tema"
-    : escuro
-      ? "Ativar tema claro"
-      : "Ativar tema escuro";
+  const alternar = () => {
+    const escuro =
+      document.documentElement.getAttribute("data-theme") === "dark";
+    setTheme(escuro ? "light" : "dark");
+  };
 
   return (
     <Button
       variant="ghost"
       size="icon"
       className={className}
-      onClick={() => setTheme(escuro ? "light" : "dark")}
-      aria-label={rotulo}
-      title={rotulo}
-      suppressHydrationWarning
+      onClick={alternar}
+      aria-label="Alternar tema"
+      title="Alternar tema claro/escuro"
     >
-      {escuro ? (
-        <Sun className="size-5" aria-hidden="true" />
-      ) : (
-        <Moon className="size-5" aria-hidden="true" />
-      )}
+      <Moon className="size-5 dark:hidden" aria-hidden="true" />
+      <Sun className="hidden size-5 dark:block" aria-hidden="true" />
     </Button>
   );
 }

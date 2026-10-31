@@ -33,10 +33,21 @@ export function Carrossel({
   useEffect(() => {
     const elemento = trilho.current;
     if (!elemento) return;
-    medir();
+
+    // Medir direto no efeito acontece antes do layout dos cards: as setas
+    // nasciam desabilitadas e nunca liberavam. O rAF espera o primeiro paint e
+    // `document.fonts.ready` cobre a troca de fonte (que muda a largura).
+    const medirDepoisDoLayout = () => requestAnimationFrame(() => medir());
+    medirDepoisDoLayout();
+    void document.fonts?.ready.then(medirDepoisDoLayout);
+
     elemento.addEventListener("scroll", medir, { passive: true });
-    const observador = new ResizeObserver(medir);
+    const observador = new ResizeObserver(medirDepoisDoLayout);
     observador.observe(elemento);
+    for (const filho of Array.from(elemento.children)) {
+      observador.observe(filho);
+    }
+
     return () => {
       elemento.removeEventListener("scroll", medir);
       observador.disconnect();

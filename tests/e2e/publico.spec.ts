@@ -84,4 +84,35 @@ test.describe("catálogo público", () => {
       page.getByText(/A resposta da análise chega neste e-mail/i),
     ).toBeVisible();
   });
+
+  test("carrossel é coerente com o transbordo e o tema alterna", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const trilho = page.getByRole("region", {
+      name: /Comércios em destaque/i,
+    });
+    const avancar = page.getByRole("button", { name: /Ver mais comércios/i });
+
+    // A base de E2E pode ter poucos comércios para rolar. O contrato é: seta
+    // liberada se existe conteúdo escondido à direita — e travada se não existe.
+    const transbordo = await trilho.evaluate(
+      (elemento) => elemento.scrollWidth - elemento.clientWidth,
+    );
+
+    if (transbordo > 8) {
+      await expect(avancar).toBeEnabled();
+      const antes = await trilho.evaluate((el) => el.scrollLeft);
+      await avancar.click();
+      await expect
+        .poll(() => trilho.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(antes);
+    } else {
+      await expect(avancar).toBeDisabled();
+    }
+
+    await page.getByRole("button", { name: "Alternar tema" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  });
 });
