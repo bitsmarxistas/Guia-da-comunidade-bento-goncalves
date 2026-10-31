@@ -1,9 +1,15 @@
 // src/app/api/auth/login/route.ts
 import { loginAction } from "@/application/auth/login";
 import { NextRequest, NextResponse } from "next/server";
-import { validarJWTNode } from "@/infrastructure/auth/jwt-node";
-import { createHash } from "crypto";
 
+/**
+ * Login por formulário/JSON.
+ *
+ * A resposta devolve apenas o resultado e o destino. Antes vinha também o JWT
+ * cru, o hash dele e um payload de "auto-teste": qualquer pessoa (ou log,
+ * proxy ou ferramenta de monitoramento) que visse o corpo da resposta teria um
+ * token válido, e isso anula a proteção do cookie httpOnly.
+ */
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") || "";
   let email: string;
@@ -25,39 +31,22 @@ export async function POST(request: NextRequest) {
 
   const result = await loginAction(null, formData);
 
-  if (result.error) {
+  if ("error" in result && result.error) {
     return NextResponse.json({ error: result.error }, { status: 401 });
-  }
-
-  const secretHash = createHash("sha256")
-    .update(result.token || "")
-    .digest("hex")
-    .slice(0, 16);
-
-  // Auto-teste: verificar o token gerado com jsonwebtoken
-  let selfVerify: any;
-  if (result.token) {
-    const payload = validarJWTNode(result.token);
-    selfVerify = payload
-      ? { success: true, payload }
-      : { success: false, error: "validarJWTNode returned null" };
   }
 
   const response = NextResponse.json({
     success: true,
-    redirect: result.redirect,
-    secretHash,
-    token: result.token,
-    selfVerify,
+    redirect: "redirect" in result ? result.redirect : "/admin",
   });
 
-  // Set auth cookie
-  if (result.token) {
-    response.cookies.set("auth_token", result.token, {
+  const token = "token" in result ? result.token : undefined;
+  if (token) {
+    response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60, // 7 dias
       path: "/",
     });
   }
