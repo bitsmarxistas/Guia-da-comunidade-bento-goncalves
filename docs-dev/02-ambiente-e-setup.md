@@ -66,8 +66,16 @@ pnpm db:restore      # drill de restauração contra banco LOCAL (ver 06)
 | `pnpm db:seed:config`     | os 11 parâmetros operacionais (`configuracao`)    |
 | `pnpm db:seed:legais`     | termos de uso, privacidade e ROPA (versão 2.0)    |
 | `pnpm db:geocodificar`    | coordenadas das fichas (alimenta o mapa da ficha) |
+| `pnpm db:importar:lista`  | lista de contatos vira fila de aprovação          |
 
 Todos são idempotentes na medida do possível: rodar de novo não duplica dados.
+
+O `db:importar:lista -- --limpar --confirmar` **apaga o conteúdo** (negócios,
+solicitações, contatos, imagens, votações, contestações, fórum, aceites) e mantém
+categorias, administradores, documentos legais e parâmetros. Depois insere a lista
+de `src/scripts/importacao/lista-whatsapp.ts` como solicitações `recebida` — ou
+seja, **nada é publicado**: cada item passa pela aprovação no painel, igual a um
+envio pelo formulário público. Use `--dry-run` para ver o efeito antes.
 
 O `db:seed:legais` publica os documentos legais que as páginas `/termos` e
 `/privacidade` renderizam: ele grava a versão nova como vigente e aposenta
