@@ -101,7 +101,8 @@ export async function CatalogoView({
   const pagina = parsePagina(searchParams.pagina);
 
   const [categorias, bairros] = await Promise.all([
-    listarCategoriasAtivas(),
+    // No catálogo a categoria oculta continua disponível como filtro.
+    listarCategoriasAtivas({ incluirOcultas: true }),
     listarBairrosComNegocios(),
   ]);
 

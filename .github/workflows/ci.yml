@@ -28,6 +28,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Segredos vazados em arquivos rastreados
+        run: pnpm check:segredos
+
       - name: Typecheck
         run: pnpm typecheck
 

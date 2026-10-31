@@ -65,7 +65,7 @@ export default async function CategoriasPage({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap items-end gap-3">
+          <form method="get" className="flex flex-wrap items-end gap-3">
             <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
@@ -77,14 +77,18 @@ export default async function CategoriasPage({
                   id="busca"
                   name="busca"
                   placeholder="Nome da categoria..."
-                  value={params.busca || ""}
+                  defaultValue={params.busca || ""}
                   className="h-10 pl-10"
                 />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ativa">Status</Label>
-              <NativeSelect id="ativa" name="ativa" value={params.ativa || ""}>
+              <NativeSelect
+                id="ativa"
+                name="ativa"
+                defaultValue={params.ativa || ""}
+              >
                 <option value="">Todas</option>
                 <option value="true">Ativas</option>
                 <option value="false">Inativas</option>

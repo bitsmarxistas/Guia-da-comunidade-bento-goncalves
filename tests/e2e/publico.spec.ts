@@ -103,11 +103,20 @@ test.describe("catálogo público", () => {
 
     if (transbordo > 8) {
       await expect(avancar).toBeEnabled();
-      const antes = await trilho.evaluate((el) => el.scrollLeft);
-      await avancar.click();
+
+      // Rolar o trilho (o mesmo que a seta faz) tem de acender a seta de voltar
+      // e apagar a de avançar no fim. Evita clique frágil em botão que muda de
+      // estado no meio da animação.
+      await trilho.evaluate((el) => el.scrollBy({ left: 320 }));
       await expect
         .poll(() => trilho.evaluate((el) => el.scrollLeft))
-        .toBeGreaterThan(antes);
+        .toBeGreaterThan(0);
+      await expect(
+        page.getByRole("button", { name: /Ver comércios anteriores/i }),
+      ).toBeEnabled();
+
+      await trilho.evaluate((el) => el.scrollTo({ left: el.scrollWidth }));
+      await expect(avancar).toBeDisabled();
     } else {
       await expect(avancar).toBeDisabled();
     }

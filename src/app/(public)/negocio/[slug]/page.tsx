@@ -17,6 +17,7 @@ import { buscarNegocioPorSlug } from "@/application/negocios/listar";
 import { Button } from "@/ui/components/button";
 import { ShareButton } from "@/ui/components/share-button";
 import { GlifoInstagram, GlifoWhatsApp } from "@/ui/components/brand/glifos";
+import { JsonLd } from "@/app/(public)/_components/dados-estruturados";
 
 export const revalidate = 60;
 
@@ -87,6 +88,65 @@ type NegocioComRelacoes = NonNullable<
   Awaited<ReturnType<typeof buscarNegocioPorSlug>>
 >;
 
+// O template do layout acrescenta " · GuiaBG" (10 caracteres).
+const LIMITE_TITULO = 50;
+const LIMITE_DESCRICAO = 160;
+const CONTEXTO_DESCRICAO =
+  "Confira contatos, horários de funcionamento e endereço no GuiaBG, o guia comunitário de Bento Gonçalves.";
+const DIAS_SCHEMA = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+function normalizarEspacos(texto: string): string {
+  return texto.replace(/\s+/g, " ").trim();
+}
+
+function truncarTexto(texto: string, limite: number): string {
+  const limpo = normalizarEspacos(texto);
+  if (limpo.length <= limite) return limpo;
+
+  const corte = limpo.slice(0, limite - 1);
+  const ultimoEspaco = corte.lastIndexOf(" ");
+  const base =
+    ultimoEspaco >= Math.floor(limite * 0.6)
+      ? corte.slice(0, ultimoEspaco)
+      : corte;
+
+  return `${base.trimEnd()}…`;
+}
+
+function montarTitulo(negocio: NegocioComRelacoes): string {
+  const categoria = negocio.categorias[0]?.categoria?.nome;
+  const nome = normalizarEspacos(negocio.nome);
+  const comCategoria = categoria ? `${nome} — ${categoria}` : nome;
+  const candidato = comCategoria.length <= LIMITE_TITULO ? comCategoria : nome;
+
+  return truncarTexto(candidato, LIMITE_TITULO);
+}
+
+/**
+ * Descrição de 120 a 160 caracteres: usa os dados factuais do comércio e,
+ * quando o texto original é curto, completa com a chamada para a ficha.
+ * O corte acontece em limite de palavra para não exibir palavra pela metade.
+ */
+function montarDescricao(negocio: NegocioComRelacoes): string {
+  const categoria = negocio.categorias[0]?.categoria?.nome;
+  const bairro = negocio.localizacao?.bairro;
+  const local = bairro ? ` no bairro ${bairro}` : " em Bento Gonçalves";
+  const ramo = categoria ? `, ${categoria}` : "";
+
+  return truncarTexto(
+    `${normalizarEspacos(negocio.nome)}${local}${ramo}. ${normalizarEspacos(negocio.descricao)} ${CONTEXTO_DESCRICAO}`,
+    LIMITE_DESCRICAO,
+  );
+}
+
 function contatosPorTipo(negocio: NegocioComRelacoes, tipo: string) {
   return negocio.contatos
     .filter((contato) => contato.tipo === tipo)
@@ -119,18 +179,25 @@ export async function generateMetadata({
   const negocio = await buscarNegocioPorSlug(slug);
 
   if (!negocio) {
-    return { title: "Comércio não encontrado" };
+    return {
+      title: "Comércio não encontrado",
+      description:
+        "Este comércio não está publicado ou o endereço mudou. Volte ao catálogo para encontrar outros comércios e serviços de Bento Gonçalves.",
+      robots: { index: false, follow: false },
+    };
   }
 
-  const url = `${urlSite}/negocio/${slug}`;
-  const descricao = negocio.descricao.slice(0, 160);
+  const url = `${urlSite}/negocio/${encodeURIComponent(slug)}`;
+  const titulo = montarTitulo(negocio);
+  const descricao = montarDescricao(negocio);
 
   return {
-    title: negocio.nome,
+    title: titulo,
     description: descricao,
     alternates: { canonical: `/negocio/${slug}` },
+    robots: { index: true, follow: true },
     openGraph: {
-      title: negocio.nome,
+      title: titulo,
       description: descricao,
       type: "website",
       url,
@@ -139,7 +206,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: negocio.nome,
+      title: titulo,
       description: descricao,
     },
   };
@@ -155,7 +222,7 @@ export default async function NegocioPage({
 
   if (!negocio) notFound();
 
-  const url = `${urlSite}/negocio/${slug}`;
+  const url = `${urlSite}/negocio/${encodeURIComponent(slug)}`;
   const whatsapps = contatosPorTipo(negocio, "whatsapp");
   const telefones = contatosPorTipo(negocio, "telefone");
   const emails = contatosPorTipo(negocio, "email");
@@ -192,52 +259,55 @@ export default async function NegocioPage({
     .map((vinculo) => vinculo.categoria)
     .filter(Boolean);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: negocio.nome,
-    description: negocio.descricao,
-    url,
-    ...(telefones[0]
-      ? { telephone: formatarTelefone(telefones[0].valor) }
-      : {}),
-    ...(emails[0] ? { email: emails[0].valor } : {}),
-    ...(negocio.localizacao
-      ? {
-          address: {
-            "@type": "PostalAddress",
-            streetAddress: negocio.localizacao.endereco ?? undefined,
-            addressLocality: "Bento Gonçalves",
-            addressRegion: "RS",
-            addressCountry: "BR",
-            ...(negocio.localizacao.bairro
-              ? { addressNeighborhood: negocio.localizacao.bairro }
-              : {}),
-          },
-        }
-      : {}),
-    ...(negocio.horarios.length > 0 && !sobAgendamento
-      ? {
-          openingHoursSpecification: negocio.horarios.map((horario) => ({
-            "@type": "OpeningHoursSpecification",
-            dayOfWeek: `https://schema.org/${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][horario.diaSemana]}`,
-            opens: horaCurta(horario.horaAbertura),
-            closes: horaCurta(horario.horaFechamento),
-          })),
-        }
-      : {}),
-    ...(instagrams[0]
-      ? {
-          sameAs: [
-            `https://instagram.com/${instagrams[0].valor.replace(/^@/, "")}`,
-          ],
-        }
-      : {}),
-  };
+  const redesSociais = [
+    ...instagrams.map(
+      (contato) =>
+        `https://instagram.com/${contato.valor.replace(/^@/, "").replace(/\/+$/, "")}`,
+    ),
+    ...sites.map((contato) =>
+      contato.valor.startsWith("http")
+        ? contato.valor
+        : `https://${contato.valor}`,
+    ),
+  ];
+  const sameAs = [...new Set(redesSociais)];
+  const areaAtendimento = negocio.localizacao?.areaAtendimento?.trim();
+
+  const areaServed = [
+    {
+      "@type": "City",
+      name: "Bento Gonçalves",
+      containedInPlace: { "@type": "State", name: "Rio Grande do Sul" },
+    },
+    ...(negocio.localizacao?.bairro
+      ? [{ "@type": "Place", name: negocio.localizacao.bairro }]
+      : []),
+    ...(areaAtendimento && areaAtendimento !== "Bento Gonçalves"
+      ? [{ "@type": "AdministrativeArea", name: areaAtendimento }]
+      : []),
+  ];
+
+  const openingHoursSpecification =
+    negocio.horarios.length > 0 && !sobAgendamento
+      ? negocio.horarios.flatMap((horario) => {
+          const dia = DIAS_SCHEMA[horario.diaSemana];
+          if (!dia) return [];
+
+          return [
+            {
+              "@type": "OpeningHoursSpecification",
+              dayOfWeek: `https://schema.org/${dia}`,
+              opens: horaCurta(horario.horaAbertura),
+              closes: horaCurta(horario.horaFechamento),
+            },
+          ];
+        })
+      : [];
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
+    "@id": `${url}#breadcrumb`,
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Início", item: urlSite },
       {
@@ -250,16 +320,42 @@ export default async function NegocioPage({
     ],
   };
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${url}#localbusiness`,
+    name: negocio.nome,
+    description: negocio.descricao,
+    url,
+    breadcrumb: { "@id": `${url}#breadcrumb` },
+    ...(telefones[0]
+      ? { telephone: formatarTelefone(telefones[0].valor) }
+      : {}),
+    ...(emails[0] ? { email: emails[0].valor } : {}),
+    ...(negocio.localizacao
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            ...(negocio.localizacao.endereco
+              ? { streetAddress: negocio.localizacao.endereco }
+              : {}),
+            addressLocality: "Bento Gonçalves",
+            addressRegion: "RS",
+            addressCountry: "BR",
+          },
+        }
+      : {}),
+    areaServed,
+    ...(openingHoursSpecification.length > 0
+      ? { openingHoursSpecification }
+      : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
+  };
+
   return (
     <div className="bg-canvas">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
-      />
+      <JsonLd dados={jsonLd} />
+      <JsonLd dados={breadcrumbLd} />
 
       <div className="container-page py-8 md:py-10">
         {/* Breadcrumb */}
@@ -607,7 +703,7 @@ export default async function NegocioPage({
 
               <div className="mt-5 border-t border-line pt-4">
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={`/solicitar?negocio=${negocio.id}`}>
+                  <Link href={`/negocio/${slug}/correcao`}>
                     <Pencil className="size-4" aria-hidden="true" />
                     Pedir correção
                   </Link>

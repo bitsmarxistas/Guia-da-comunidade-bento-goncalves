@@ -71,7 +71,7 @@ export default async function NegociosPage({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap items-end gap-3">
+          <form method="get" className="flex flex-wrap items-end gap-3">
             <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
@@ -83,7 +83,7 @@ export default async function NegociosPage({
                   id="busca"
                   name="busca"
                   placeholder="Nome do comércio..."
-                  value={params.busca || ""}
+                  defaultValue={params.busca || ""}
                   className="h-10 pl-10"
                 />
               </div>
@@ -93,7 +93,7 @@ export default async function NegociosPage({
               <NativeSelect
                 id="situacao"
                 name="situacao"
-                value={params.situacao || ""}
+                defaultValue={params.situacao || ""}
               >
                 <option value="">Todas</option>
                 {SITUACOES.map((s) => (

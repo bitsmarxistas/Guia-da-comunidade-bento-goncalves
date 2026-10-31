@@ -25,6 +25,7 @@ import { appendLog } from "@/infrastructure/audit/audit.service";
 import { exigirContextoAdmin } from "@/lib/audit-context";
 import { normalizarSlug } from "@/domain/utils/normalizar-slug";
 import { gerarSlugUnico } from "@/domain/utils/gerar-slug-unico";
+import { ErroDominio } from "@/domain/errors/domain-error";
 
 const analisarSolicitacaoSchema = z.object({
   solicitacaoId: z.string().uuid(),
@@ -81,132 +82,253 @@ export async function analisarSolicitacaoAction(
       // Criar negócio a partir dos dados propostos
       const dados = sol.dadosNegocioProposto as Record<string, unknown>;
 
-      // Gerar slug único
-      const baseSlug = dados.nome
-        ? normalizarSlug(dados.nome as string)
-        : "sem-nome";
-      const existentes = new Set(
-        (await tx.select({ slug: negocio.slug }).from(negocio)).map(
-          (n) => n.slug,
-        ),
-      );
-      const slugUnico = gerarSlugUnico(baseSlug, existentes);
+      if (sol.tipo === "atualizacao" && sol.negocioId) {
+        /**
+         * Correção aprovada = MODIFICAR o comércio existente.
+         * Antes, aprovar uma solicitação do tipo "atualizacao" criava um segundo
+         * cadastro do mesmo comércio (o fluxo só sabia inserir). Aqui o pedido
+         * de correção atualiza a ficha e mantém o slug/URL estável.
+         */
+        const [alvo] = await tx
+          .select({
+            id: negocio.id,
+            nome: negocio.nome,
+            descricao: negocio.descricao,
+          })
+          .from(negocio)
+          .where(eq(negocio.id, sol.negocioId))
+          .limit(1);
 
-      const [novoNegocio] = await tx
-        .insert(negocio)
-        .values({
-          slug: slugUnico,
-          nome: dados.nome as string,
-          descricao: dados.descricao as string,
-          situacaoPublicacao: "publicado",
-          fonte: "solicitacao_publica",
-          solicitacaoOrigemId: sol.id,
-        })
-        .returning();
+        if (!alvo) {
+          throw new ErroDominio(
+            "NEGOCIO_INEXISTENTE",
+            "O comércio desta correção não existe mais.",
+          );
+        }
 
-      if (!novoNegocio) throw new Error("Falha ao criar negócio");
+        const snapshotAntes = {
+          nome: alvo.nome,
+          descricao: alvo.descricao,
+        };
 
-      // Criar contatos
-      const contatosData =
-        (dados.contatos as Array<{
+        await tx
+          .update(negocio)
+          .set({
+            nome: (dados.nome as string) ?? alvo.nome,
+            descricao: (dados.descricao as string) ?? alvo.descricao,
+            atualizadoEm: new Date(),
+          })
+          .where(eq(negocio.id, alvo.id));
+
+        await tx.delete(contato).where(eq(contato.negocioId, alvo.id));
+        for (const c of (dados.contatos as Array<{
           tipo: string;
           valor: string;
           ordem: number;
-        }>) || [];
-      for (const c of contatosData) {
-        await tx.insert(contato).values({
-          negocioId: novoNegocio.id,
-          tipo: c.tipo,
-          valor: c.valor,
-          ordem: c.ordem,
-        });
-      }
+        }>) ?? []) {
+          await tx.insert(contato).values({
+            negocioId: alvo.id,
+            tipo: c.tipo,
+            valor: c.valor,
+            ordem: c.ordem,
+          });
+        }
 
-      // Criar localização se houver
-      if (dados.localizacao) {
-        const loc = dados.localizacao as Record<string, string>;
-        await tx.insert(localizacao).values({
-          negocioId: novoNegocio.id,
-          endereco: loc.endereco,
-          bairro: loc.bairro,
-          areaAtendimento: loc.areaAtendimento,
-        });
-      }
+        await tx.delete(localizacao).where(eq(localizacao.negocioId, alvo.id));
+        if (dados.localizacao) {
+          const loc = dados.localizacao as Record<string, string>;
+          await tx.insert(localizacao).values({
+            negocioId: alvo.id,
+            endereco: loc.endereco,
+            bairro: loc.bairro,
+            areaAtendimento: loc.areaAtendimento,
+          });
+        }
 
-      // Criar horários se houver
-      const horariosData =
-        (dados.horarios as Array<{
+        await tx
+          .delete(horarioFuncionamento)
+          .where(eq(horarioFuncionamento.negocioId, alvo.id));
+        for (const h of (dados.horarios as Array<{
           diaSemana: number;
           horaAbertura: string;
           horaFechamento: string;
           observacao?: string;
-        }>) || [];
-      for (const h of horariosData) {
-        await tx.insert(horarioFuncionamento).values({
-          negocioId: novoNegocio.id,
-          diaSemana: h.diaSemana,
-          horaAbertura: h.horaAbertura,
-          horaFechamento: h.horaFechamento,
-          observacao: h.observacao,
-        });
-      }
-
-      // Vincular categorias
-      const categoriasIds = (dados.categoriasIds as string[]) || [];
-      for (const catId of categoriasIds) {
-        await tx.insert(negocioCategoria).values({
-          negocioId: novoNegocio.id,
-          categoriaId: catId,
-        });
-      }
-
-      // Processar sugestão de categoria se houver
-      if (sol.sugestaoCategoria && sol.sugestaoCategoria.length > 0) {
-        const sug = sol.sugestaoCategoria[0];
-        if (sug.situacao === "aceita" && sug.categoriaCriadaId) {
-          await tx.insert(negocioCategoria).values({
-            negocioId: novoNegocio.id,
-            categoriaId: sug.categoriaCriadaId,
+        }>) ?? []) {
+          await tx.insert(horarioFuncionamento).values({
+            negocioId: alvo.id,
+            diaSemana: h.diaSemana,
+            horaAbertura: h.horaAbertura,
+            horaFechamento: h.horaFechamento,
+            observacao: h.observacao,
           });
         }
-      }
 
-      // Atualizar solicitação
-      await tx
-        .update(solicitacao)
-        .set({
-          situacao: "aprovada",
+        await tx
+          .delete(negocioCategoria)
+          .where(eq(negocioCategoria.negocioId, alvo.id));
+        for (const catId of (dados.categoriasIds as string[]) ?? []) {
+          await tx.insert(negocioCategoria).values({
+            negocioId: alvo.id,
+            categoriaId: catId,
+          });
+        }
+
+        await tx
+          .update(solicitacao)
+          .set({
+            situacao: "aprovada",
+            analisadaEm: new Date(),
+            observacoesInternas,
+          })
+          .where(eq(solicitacao.id, solicitacaoId));
+
+        resultado = { situacao: "aprovada", negocioId: alvo.id };
+
+        await tx.insert(logSolicitacaoAnalisada).values({
+          atorTipo: "admin",
+          atorId: contexto.atorId,
+          solicitacaoId,
+          decisao: "aprovar",
+          justificativa,
+          negocioId: alvo.id,
+        });
+
+        await tx.insert(logNegocio).values({
+          atorTipo: "admin",
+          atorId: contexto.atorId,
+          negocioId: alvo.id,
+          acao: "atualizar_via_solicitacao",
+          snapshotAntes: JSON.stringify(snapshotAntes),
+          snapshotDepois: JSON.stringify(dados),
+        });
+      } else {
+        // Gerar slug único
+        const baseSlug = dados.nome
+          ? normalizarSlug(dados.nome as string)
+          : "sem-nome";
+        const existentes = new Set(
+          (await tx.select({ slug: negocio.slug }).from(negocio)).map(
+            (n) => n.slug,
+          ),
+        );
+        const slugUnico = gerarSlugUnico(baseSlug, existentes);
+
+        const [novoNegocio] = await tx
+          .insert(negocio)
+          .values({
+            slug: slugUnico,
+            nome: dados.nome as string,
+            descricao: dados.descricao as string,
+            situacaoPublicacao: "publicado",
+            fonte: "solicitacao_publica",
+            solicitacaoOrigemId: sol.id,
+          })
+          .returning();
+
+        if (!novoNegocio) throw new Error("Falha ao criar negócio");
+
+        // Criar contatos
+        const contatosData =
+          (dados.contatos as Array<{
+            tipo: string;
+            valor: string;
+            ordem: number;
+          }>) || [];
+        for (const c of contatosData) {
+          await tx.insert(contato).values({
+            negocioId: novoNegocio.id,
+            tipo: c.tipo,
+            valor: c.valor,
+            ordem: c.ordem,
+          });
+        }
+
+        // Criar localização se houver
+        if (dados.localizacao) {
+          const loc = dados.localizacao as Record<string, string>;
+          await tx.insert(localizacao).values({
+            negocioId: novoNegocio.id,
+            endereco: loc.endereco,
+            bairro: loc.bairro,
+            areaAtendimento: loc.areaAtendimento,
+          });
+        }
+
+        // Criar horários se houver
+        const horariosData =
+          (dados.horarios as Array<{
+            diaSemana: number;
+            horaAbertura: string;
+            horaFechamento: string;
+            observacao?: string;
+          }>) || [];
+        for (const h of horariosData) {
+          await tx.insert(horarioFuncionamento).values({
+            negocioId: novoNegocio.id,
+            diaSemana: h.diaSemana,
+            horaAbertura: h.horaAbertura,
+            horaFechamento: h.horaFechamento,
+            observacao: h.observacao,
+          });
+        }
+
+        // Vincular categorias
+        const categoriasIds = (dados.categoriasIds as string[]) || [];
+        for (const catId of categoriasIds) {
+          await tx.insert(negocioCategoria).values({
+            negocioId: novoNegocio.id,
+            categoriaId: catId,
+          });
+        }
+
+        // Processar sugestão de categoria se houver
+        if (sol.sugestaoCategoria && sol.sugestaoCategoria.length > 0) {
+          const sug = sol.sugestaoCategoria[0];
+          if (sug.situacao === "aceita" && sug.categoriaCriadaId) {
+            await tx.insert(negocioCategoria).values({
+              negocioId: novoNegocio.id,
+              categoriaId: sug.categoriaCriadaId,
+            });
+          }
+        }
+
+        // Atualizar solicitação
+        await tx
+          .update(solicitacao)
+          .set({
+            situacao: "aprovada",
+            negocioId: novoNegocio.id,
+            analisadaEm: new Date(),
+            observacoesInternas,
+          })
+          .where(eq(solicitacao.id, solicitacaoId));
+
+        resultado = { situacao: "aprovada", negocioId: novoNegocio.id };
+
+        // Log de auditoria
+        await tx.insert(logSolicitacaoAnalisada).values({
+          atorTipo: "admin",
+          atorId: contexto.atorId,
+          solicitacaoId,
+          decisao: "aprovar",
+          justificativa,
           negocioId: novoNegocio.id,
-          analisadaEm: new Date(),
-          observacoesInternas,
-        })
-        .where(eq(solicitacao.id, solicitacaoId));
+        });
 
-      resultado = { situacao: "aprovada", negocioId: novoNegocio.id };
+        await tx.insert(logVinculacaoSolicitacao).values({
+          atorTipo: "sistema",
+          solicitacaoId,
+          negocioIdDepois: novoNegocio.id,
+        });
 
-      // Log de auditoria
-      await tx.insert(logSolicitacaoAnalisada).values({
-        atorTipo: "admin",
-        atorId: contexto.atorId,
-        solicitacaoId,
-        decisao: "aprovar",
-        justificativa,
-        negocioId: novoNegocio.id,
-      });
-
-      await tx.insert(logVinculacaoSolicitacao).values({
-        atorTipo: "sistema",
-        solicitacaoId,
-        negocioIdDepois: novoNegocio.id,
-      });
-
-      await tx.insert(logNegocio).values({
-        atorTipo: "sistema",
-        negocioId: novoNegocio.id,
-        acao: "criar_via_solicitacao",
-        snapshotAntes: null,
-        snapshotDepois: JSON.stringify(dados),
-      });
+        await tx.insert(logNegocio).values({
+          atorTipo: "sistema",
+          negocioId: novoNegocio.id,
+          acao: "criar_via_solicitacao",
+          snapshotAntes: null,
+          snapshotDepois: JSON.stringify(dados),
+        });
+      }
     } else if (decisao === "reprovar") {
       await tx
         .update(solicitacao)

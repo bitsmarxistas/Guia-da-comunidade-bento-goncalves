@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/components/button";
@@ -39,6 +40,13 @@ const navigation: NavItem[] = [
   { name: "Imagens", href: "/admin/imagens", icon: Image },
   { name: "Configurações", href: "/admin/configuracoes", icon: Settings },
 ];
+
+/**
+ * Administradores só aparece para o administrador principal
+ * (admin@guiabg.com.br). A visibilidade aqui é conveniência: a página e as
+ * actions repetem a checagem no servidor.
+ */
+const ADMIN_RAIZ = "admin@guiabg.com.br";
 
 export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
   const pathname = usePathname();
@@ -101,7 +109,18 @@ export function Sidebar({ admin }: { admin: { nome: string; email: string } }) {
         aria-label="Menu principal"
       >
         <ul className="space-y-1" role="list">
-          {navigation.map((item) => {
+          {[
+            ...navigation,
+            ...(admin.email === ADMIN_RAIZ
+              ? [
+                  {
+                    name: "Administradores",
+                    href: "/admin/administradores",
+                    icon: ShieldCheck,
+                  } as NavItem,
+                ]
+              : []),
+          ].map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
             return (

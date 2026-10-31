@@ -11,16 +11,28 @@ const editarCategoriaSchema = z.object({
   id: z.string().uuid(),
   nome: z.string().min(1).max(100).optional(),
   descricao: z.string().max(500).optional(),
+  oculta: z.boolean().optional(),
+  ativa: z.boolean().optional(),
 });
 
 export async function editarCategoriaAction(
   prevState: unknown,
   formData: FormData,
 ) {
+  const brutoOculta = formData.get("oculta");
+  const brutoAtiva = formData.get("ativa");
   const rawData = {
     id: formData.get("id"),
     nome: formData.get("nome") || undefined,
     descricao: formData.get("descricao") || undefined,
+    oculta:
+      brutoOculta === null
+        ? undefined
+        : brutoOculta === "on" || brutoOculta === "true",
+    ativa:
+      brutoAtiva === null
+        ? undefined
+        : brutoAtiva === "on" || brutoAtiva === "true",
   };
 
   const parseResult = editarCategoriaSchema.safeParse(rawData);
@@ -28,7 +40,7 @@ export async function editarCategoriaAction(
     return { error: "Dados inválidos." };
   }
 
-  const { id, nome, descricao } = parseResult.data;
+  const { id, nome, descricao, oculta, ativa } = parseResult.data;
 
   const atual = await db.query.categoria.findFirst({
     where: eq(categoria.id, id),
@@ -64,6 +76,8 @@ export async function editarCategoriaAction(
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "") ?? atual.nome,
       descricao: descricao?.trim() ?? atual.descricao,
+      ...(oculta === undefined ? {} : { oculta }),
+      ...(ativa === undefined ? {} : { ativa }),
     })
     .where(eq(categoria.id, id))
     .returning();

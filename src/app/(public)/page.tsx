@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import {
@@ -15,8 +16,80 @@ import { buscarNegocios, listarCategoriasAtivas } from "@/application/catalogo";
 import { Button } from "@/ui/components/button";
 import { NegocioCard } from "./_components/negocio-card";
 import { Carrossel } from "./_components/carrossel";
+import { JsonLd } from "./_components/dados-estruturados";
 
 export const revalidate = 60;
+
+const urlSite = (
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://guiabg.com.br"
+).replace(/\/+$/, "");
+
+const DESCRICAO =
+  "Guia comunitário de Bento Gonçalves: encontre padarias, restaurantes, oficinas, salões e serviços perto de você. Feito por quem vive na cidade.";
+
+export const metadata: Metadata = {
+  title: "Comércios e serviços de Bento Gonçalves",
+  description: DESCRICAO,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "GuiaBG — comércios e serviços de Bento Gonçalves",
+    description: DESCRICAO,
+    url: "/",
+    type: "website",
+    siteName: "GuiaBG",
+    locale: "pt_BR",
+    images: ["/opengraph-image"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GuiaBG — comércios e serviços de Bento Gonçalves",
+    description: DESCRICAO,
+  },
+};
+
+/**
+ * WebSite + Organization (schema.org) para a home. O SearchAction aponta para
+ * a busca do catálogo, que é a rota indexável de resultados (a /busca é noindex).
+ */
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${urlSite}/#website`,
+      url: urlSite,
+      name: "GuiaBG",
+      description: DESCRICAO,
+      inLanguage: "pt-BR",
+      publisher: { "@id": `${urlSite}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${urlSite}/catalogo?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${urlSite}/#organization`,
+      name: "GuiaBG",
+      url: urlSite,
+      description:
+        "Guia comunitário de comércios e serviços de Bento Gonçalves, feito pela comunidade.",
+      logo: {
+        "@type": "ImageObject",
+        url: `${urlSite}/apple-icon.png`,
+      },
+      areaServed: {
+        "@type": "City",
+        name: "Bento Gonçalves",
+        containedInPlace: { "@type": "State", name: "Rio Grande do Sul" },
+      },
+    },
+  ],
+};
 
 /**
  * Home (§5.2) — herói editorial com o pontilhado aprovado, categorias,
@@ -63,6 +136,8 @@ export default async function HomePage() {
 
   return (
     <div className="bg-canvas">
+      <JsonLd dados={jsonLd} />
+
       {/* 1. Herói editorial */}
       <section className="relative overflow-hidden border-b border-line bg-surface hero-dots">
         <div className="container-page relative py-16 md:py-24">

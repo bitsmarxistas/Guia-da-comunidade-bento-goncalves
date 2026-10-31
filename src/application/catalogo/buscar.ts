@@ -406,9 +406,23 @@ export async function buscarNegocioPorSlug(slug: string) {
   };
 }
 
-export async function listarCategoriasAtivas() {
+/**
+ * Categorias ativas do guia.
+ *
+ * `incluirOcultas = false` (padrão) devolve só as **principais**, usadas na home
+ * e nos atalhos. O catálogo e os filtros chamam com `true`, porque lá a
+ * categoria oculta continua existindo para o visitante.
+ */
+export async function listarCategoriasAtivas(
+  opcoes: { incluirOcultas?: boolean } = {},
+) {
+  const incluirOcultas = opcoes.incluirOcultas ?? false;
+
   return db.query.categoria.findMany({
-    where: (c, { eq }) => eq(c.ativa, true),
+    where: (c, { eq, and }) =>
+      incluirOcultas
+        ? eq(c.ativa, true)
+        : and(eq(c.ativa, true), eq(c.oculta, false)),
     orderBy: (c, { asc }) => asc(c.nome),
   });
 }

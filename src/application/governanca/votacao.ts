@@ -201,6 +201,8 @@ export async function abrirVotacaoAction(
 
   revalidatePath("/admin/solicitacoes");
   revalidatePath(`/admin/negocios/${cont.negocioId}`);
+  // A tela /admin/votacoes precisa refletir a votação recém-aberta.
+  revalidatePath("/admin/votacoes");
 
   return { success: true };
 }
@@ -585,6 +587,8 @@ export async function apurarVotacaoAction(
     if (vot.contestacao) {
       revalidatePath(`/admin/negocios/${vot.contestacao.negocioId}`);
     }
+    // A tela /admin/votacoes mostra a situação/resultado após a apuração.
+    revalidatePath("/admin/votacoes");
 
     return { success: true, resultado: apuracao.situacao };
   } catch (e) {

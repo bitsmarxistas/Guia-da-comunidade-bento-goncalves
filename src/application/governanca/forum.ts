@@ -120,6 +120,9 @@ export async function criarForumPublicacaoAction(
 
   revalidatePath(`/admin/solicitacoes`);
   revalidatePath(`/admin/negocios/${negocioId}`);
+  // A tela /admin/forum lista as publicações: sem isto ela só atualizaria
+  // depois de um refresh manual.
+  revalidatePath("/admin/forum");
 
   return { success: true };
 }

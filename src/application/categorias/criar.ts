@@ -12,6 +12,7 @@ import { logCategoria } from "@/infrastructure/db/schema/logs";
 const criarCategoriaSchema = z.object({
   nome: z.string().min(1).max(100),
   descricao: z.string().max(500).optional(),
+  oculta: z.boolean().default(false),
 });
 
 export async function criarCategoriaAction(
@@ -21,6 +22,8 @@ export async function criarCategoriaAction(
   const rawData = {
     nome: formData.get("nome"),
     descricao: formData.get("descricao") || undefined,
+    oculta:
+      formData.get("oculta") === "on" || formData.get("oculta") === "true",
   };
 
   const parseResult = criarCategoriaSchema.safeParse(rawData);
@@ -34,7 +37,7 @@ export async function criarCategoriaAction(
     };
   }
 
-  const { nome, descricao } = parseResult.data;
+  const { nome, descricao, oculta } = parseResult.data;
 
   // Verificar duplicata (normalizado)
   const nomeNormalizado = nome
@@ -68,6 +71,7 @@ export async function criarCategoriaAction(
       nome: nomeNormalizado,
       descricao: descricao?.trim() || null,
       ativa: true,
+      oculta,
     })
     .returning();
 

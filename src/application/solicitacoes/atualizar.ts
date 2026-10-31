@@ -57,6 +57,8 @@ const atualizarSolicitacaoSchema = z.object({
       }),
     )
     .optional(),
+  // Comércio que está sendo corrigido (obrigatório no fluxo de correção).
+  negocioId: z.string().uuid().optional(),
   // Declaração e aceite
   declaracaoVinculo: z.string().min(1),
   aceiteTermos: z
@@ -64,6 +66,13 @@ const atualizarSolicitacaoSchema = z.object({
     .refine((v) => v === true, "É obrigatório aceitar os termos"),
 });
 
+/**
+ * Corrige a ficha de um comércio já publicado.
+ *
+ * Diferença central para `criarSolicitacaoAction`: aqui o pedido aponta para um
+ * comércio existente (`negocioId`) e, ao ser aprovado, ATUALIZA a ficha — não
+ * cria um segundo cadastro. Correção nunca vira inclusão.
+ */
 export async function criarSolicitacaoAtualizacaoAction(
   prevState: unknown,
   formData: FormData,
@@ -90,6 +99,7 @@ export async function criarSolicitacaoAtualizacaoAction(
       : undefined,
     declaracaoVinculo: formData.get("declaracaoVinculo"),
     aceiteTermos: formData.get("aceiteTermos") === "true",
+    negocioId: formData.get("negocioId") || undefined,
   };
 
   const parseResult = atualizarSolicitacaoSchema.safeParse(rawData);
@@ -101,6 +111,16 @@ export async function criarSolicitacaoAtualizacaoAction(
   }
 
   const data = parseResult.data;
+
+  if (data.negocioId) {
+    const alvo = await db.query.negocio.findFirst({
+      where: (n, { eq }) => eq(n.id, data.negocioId as string),
+      columns: { id: true, nome: true },
+    });
+    if (!alvo) {
+      return { error: "O comércio que você quer corrigir não existe mais." };
+    }
+  }
 
   // Verificar duplicata (nível C - apenas alerta)
   const nomeNormalizado = data.nomeNegocio
@@ -173,6 +193,7 @@ export async function criarSolicitacaoAtualizacaoAction(
       .values({
         solicitanteId: novoSolicitante.id,
         tipo: "atualizacao",
+        negocioId: data.negocioId ?? null,
         situacao: negocioEmContestacao ? "em_fila_contestacao" : "recebida",
         declaracaoVinculo: data.declaracaoVinculo.trim(),
         dadosNegocioProposto,

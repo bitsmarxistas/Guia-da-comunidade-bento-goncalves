@@ -122,7 +122,7 @@ export default async function SolicitacoesPage({
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap items-end gap-3">
+          <form method="get" className="flex flex-wrap items-end gap-3">
             <div className="min-w-[200px] flex-1 space-y-1.5">
               <Label htmlFor="busca">Buscar</Label>
               <div className="relative">
@@ -134,7 +134,7 @@ export default async function SolicitacoesPage({
                   id="busca"
                   name="busca"
                   placeholder="Nome do negócio..."
-                  value={busca || ""}
+                  defaultValue={busca || ""}
                   className="h-10 pl-10"
                 />
               </div>
@@ -144,7 +144,7 @@ export default async function SolicitacoesPage({
               <NativeSelect
                 id="situacao"
                 name="situacao"
-                value={situacao || ""}
+                defaultValue={situacao || ""}
               >
                 <option value="">Todas</option>
                 {SITUACOES.map((s) => (
@@ -156,7 +156,7 @@ export default async function SolicitacoesPage({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="tipo">Tipo</Label>
-              <NativeSelect id="tipo" name="tipo" value={tipo || ""}>
+              <NativeSelect id="tipo" name="tipo" defaultValue={tipo || ""}>
                 <option value="">Todos</option>
                 {TIPOS.map((t) => (
                   <option key={t.value} value={t.value}>
