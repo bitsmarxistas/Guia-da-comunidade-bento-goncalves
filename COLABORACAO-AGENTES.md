@@ -333,5 +333,37 @@ de uso de leitura de termos vigentes para as páginas legais).
   (novo cenário do wizard).
 
 Pendências em `docs-dev/07-interface.md`: filtro "aberto agora" no catálogo (exige
-mudança em `buscarNegocios`), galeria com fotos aprovadas (o catálogo não devolve
-imagens) e diálogo de correção próprio (hoje leva para `/solicitar?negocio=<id>`).
+mudança em `buscarNegocios`) e galeria com fotos aprovadas (o catálogo não
+devolve imagens). O diálogo de correção próprio foi implementado depois.
+
+### 9.11 Admin funcional, correção aprovada e categorias ocultas (01/11)
+
+Retomada depois do relato de que o admin "não funcionava". Diagnóstico feito
+rodando o app, não lendo código:
+
+- **Filtros não funcionavam** porque os campos usavam `value` sem `onChange`
+  (input controlado sem handler = read-only). Trocado por `defaultValue` e
+  `method="get"` em solicitações, comércios e categorias.
+- **Aprovar funcionava** — o teste de ponta a ponta aprovou uma solicitação
+  pendente. O que parecia quebrado era: filtro travado + abrir registro já
+  decidido (o select fica "Já analisada").
+- **Novo/editar não existiam**: os links "Nova categoria" e "Novo comércio"
+  caíam em 404. Criadas as rotas `/admin/categorias/novo`,
+  `/admin/categorias/[id]`, `/admin/negocios/novo` e `/admin/negocios/[id]`
+  com formulários reais ligados às actions existentes (criar/editar/publicar).
+- **Fórum, votações e administradores**: agora têm listas reais e formulários
+  (publicar, abrir/apurar votação, criar/editar admin). Gestão de logins é
+  restrita a `admin@guiabg.com.br` — checada no servidor, não só no menu.
+- **Correção de dados** deixou de ser um link para o wizard de inclusão: existe
+  `/negocio/[slug]/correcao` e, ao aprovar, `analisarSolicitacaoAction` ATUALIZA
+  a ficha (antes criava um segundo comércio — o fluxo só sabia inserir).
+- **Categorias ocultas**: migration 0017 adiciona `categoria.oculta`. A home e os
+  atalhos mostram só as principais; catálogo e filtros continuam com todas.
+- **Segredo**: a senha do Neon não está em arquivo rastreado, mas está no
+  histórico de 3 commits antigos (repositório público) — **exige rotação**. Foi
+  adicionado `pnpm check:segredos` (roda no CI) para impedir reincidência.
+- **SEO**: metadados únicos, canônicos, Open Graph, JSON-LD (WebSite +
+  LocalBusiness + BreadcrumbList), sitemap/robots revisados e OG image por
+  comércio.
+
+Gates: typecheck OK, lint 0 erros, unit **216**, integração **36**, E2E **11**.
