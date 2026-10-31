@@ -14,6 +14,11 @@ import {
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import { AbrirVotacaoForm } from "./_components/abrir-votacao-form";
 import { ApurarVotacaoForm } from "./_components/apurar-votacao-form";
+import { encerrarVotacoesVencidas } from "@/application/governanca/encerramento-votacao";
+import {
+  calcularHorasRestantes,
+  DURACAO_VOTACAO_HORAS,
+} from "@/domain/votacao/duracao";
 import { ChevronDown } from "lucide-react";
 
 const SITUACAO_VOTACAO: Record<string, { label: string; className: string }> = {
@@ -53,6 +58,11 @@ const formatadorDataHora = new Intl.DateTimeFormat("pt-BR", {
 });
 
 export default async function VotacoesPage() {
+  // Encerramento preguiçoso: votações vencidas deixam de aparecer como
+  // "em andamento" mesmo que o cron diário ainda não tenha rodado. A função é
+  // idempotente, então renderizações concorrentes não recalculam resultado.
+  await encerrarVotacoesVencidas();
+
   const [votacoes, contestacoesAbertas, adminsAtivos, contagens] =
     await Promise.all([
       db.query.votacao.findMany({
@@ -60,10 +70,11 @@ export default async function VotacoesPage() {
         limit: 100,
         extras: {
           // Comparação de prazo feita no banco: Date.now() no render violaria
-          // react-hooks/purity.
-          prazoVencido: sql<boolean>`${votacaoTable.encerraEm} < now()`.as(
+          // react-hooks/purity. O limite é inclusivo, igual ao cron.
+          prazoVencido: sql<boolean>`${votacaoTable.encerraEm} <= now()`.as(
             "prazo_vencido",
           ),
+          agora: sql<Date>`now()`.as("agora"),
         },
         with: {
           contestacao: {
@@ -120,7 +131,7 @@ export default async function VotacoesPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Votações"
-        description="Abrir, acompanhar e apurar as votações de contestação. Área restrita à administração."
+        description="Abrir, acompanhar e apurar as votações de contestação. Toda votação dura exatamente 24 horas e encerra automaticamente. Área restrita à administração."
         restrito
       />
 
@@ -162,7 +173,8 @@ export default async function VotacoesPage() {
           <CardTitle>Abrir votação</CardTitle>
           <CardDescription>
             Só contestações oficiais com situação &quot;aberta&quot; e autor
-            ativo podem gerar votação. O quórum é congelado na abertura.
+            ativo podem gerar votação. O quórum é congelado na abertura e o
+            prazo é fixo em 24 horas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -219,9 +231,18 @@ export default async function VotacoesPage() {
               const votosNao = votos.filter(
                 (voto) => voto.escolha === "rejeicao",
               ).length;
-              const emAberto = votacao.situacao === "em_andamento";
+              const situacaoEmAndamento = votacao.situacao === "em_andamento";
+              const emAberto = situacaoEmAndamento && !votacao.prazoVencido;
               const faltam = Math.max(0, votacao.quorumMinimo - votos.length);
-              const prazoVencido = emAberto && votacao.prazoVencido;
+              const horasRestantes = calcularHorasRestantes(
+                votacao.encerraEm,
+                votacao.agora,
+              );
+              const duracaoHoras = Math.round(
+                (votacao.encerraEm.getTime() - votacao.iniciadaEm.getTime()) /
+                  3_600_000,
+              );
+              const prazoFixo = duracaoHoras === DURACAO_VOTACAO_HORAS;
               const votaram = new Set(votos.map((voto) => voto.adminId));
               const naoVotaram = adminsAtivos.filter(
                 (admin) => !votaram.has(admin.id),
@@ -242,14 +263,18 @@ export default async function VotacoesPage() {
                             >
                               {situacao.label}
                             </Badge>
-                            {prazoVencido ? (
-                              <Badge
-                                variant="outline"
-                                className="border-critical/30 bg-critical-tint text-critical"
-                              >
-                                prazo vencido
-                              </Badge>
-                            ) : null}
+                            <Badge
+                              variant="outline"
+                              className={
+                                emAberto
+                                  ? "border-brand/30 bg-brand-tint text-brand-strong"
+                                  : "border-line bg-surface-2 text-ink-soft"
+                              }
+                            >
+                              {emAberto
+                                ? `Encerra em ${horasRestantes} h`
+                                : "Encerrada"}
+                            </Badge>
                             <span className="text-xs text-ink-mute">
                               quórum de {votacao.quorumMinimo}
                             </span>
@@ -338,16 +363,23 @@ export default async function VotacoesPage() {
                               </p>
                             ) : null}
                           </div>
-                        ) : (
+                        ) : votacao.resultado ? (
                           <p className="text-sm text-ink-soft">
                             Votação encerrada com resultado{" "}
                             <strong className="font-medium text-ink">
-                              {votacao.resultado
-                                ? (SITUACAO_VOTACAO[votacao.resultado]?.label ??
-                                  votacao.resultado)
-                                : situacao.label}
+                              {SITUACAO_VOTACAO[votacao.resultado]?.label ??
+                                votacao.resultado}
                             </strong>
                             .
+                          </p>
+                        ) : situacaoEmAndamento ? (
+                          <p className="text-sm text-ink-soft">
+                            O prazo de 24 horas terminou. O encerramento
+                            automático será concluído na próxima execução.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-ink-soft">
+                            Votação encerrada.
                           </p>
                         )}
                       </div>
@@ -361,6 +393,20 @@ export default async function VotacoesPage() {
                           Detalhar votos
                         </summary>
                         <div className="space-y-3 border-t border-line px-3 py-3">
+                          <p className="text-xs text-ink-soft">
+                            {prazoFixo
+                              ? `Prazo fixo de ${DURACAO_VOTACAO_HORAS} horas.`
+                              : `Prazo herdado de ${duracaoHoras} horas.`}{" "}
+                            {emAberto
+                              ? `Encerra em ${formatadorDataHora.format(
+                                  votacao.encerraEm,
+                                )} (${horasRestantes} h restantes).`
+                              : votacao.encerradaEm
+                                ? `Encerrada em ${formatadorDataHora.format(
+                                    votacao.encerradaEm,
+                                  )}.`
+                                : "Encerrada."}
+                          </p>
                           {votos.length === 0 ? (
                             <p className="text-sm text-ink-soft">
                               Nenhum voto registrado ainda.

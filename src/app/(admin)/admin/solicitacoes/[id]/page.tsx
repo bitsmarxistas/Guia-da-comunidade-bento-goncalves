@@ -38,6 +38,7 @@ import Link from "next/link";
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import { revalidatePath } from "next/cache";
 import { AcaoForm } from "./_components/acao-form";
+import { classeSituacao, rotuloSituacao } from "@/domain/solicitacoes/situacao";
 
 interface DadosNegocioProposto {
   nome?: string;
@@ -57,14 +58,6 @@ interface DadosNegocioProposto {
   categoriasIds?: string[];
   sugestaoCategoria?: string;
 }
-
-const SITUACAO_LABELS: Record<string, string> = {
-  recebida: "Recebida",
-  em_fila_contestacao: "Em fila contestação",
-  aprovada: "Aprovada",
-  reprovada: "Reprovada",
-  incompleta: "Incompleta",
-};
 
 const TIPO_LABELS: Record<string, string> = {
   inclusao: "Inclusão",
@@ -88,23 +81,10 @@ const CONTESTACAO_TIPO_OPTIONS = [
   { value: "manifesta", label: "Manifestação (apenas registro)" },
 ] as const;
 
-const SITUACAO_CLASSES: Record<string, string> = {
-  recebida: "border-brand/20 bg-brand-tint text-brand-strong",
-  em_fila_contestacao: "border-warning/30 bg-warning-tint text-warning",
-  aprovada: "border-positive/30 bg-positive-tint text-positive",
-  reprovada: "border-critical/30 bg-critical-tint text-critical",
-  incompleta: "border-line bg-surface-2 text-ink-soft",
-};
-
 function SituacaoBadge({ situacao }: { situacao: string }) {
   return (
-    <Badge
-      variant="outline"
-      className={
-        SITUACAO_CLASSES[situacao] ?? "border-line bg-surface-2 text-ink-soft"
-      }
-    >
-      {SITUACAO_LABELS[situacao] || situacao}
+    <Badge variant="outline" className={classeSituacao(situacao)}>
+      {rotuloSituacao(situacao)}
     </Badge>
   );
 }
@@ -152,9 +132,7 @@ export default async function SolicitacaoDetailPage({
         </Link>
         <AdminPageHeader
           title={dados.nome || "Solicitação sem nome"}
-          description={`${TIPO_LABELS[sol.tipo] || sol.tipo} • ${
-            SITUACAO_LABELS[sol.situacao] || sol.situacao
-          }`}
+          description={`Protocolo ${sol.protocolo} · ${TIPO_LABELS[sol.tipo] || sol.tipo} · ${rotuloSituacao(sol.situacao)}`}
         >
           <SituacaoBadge situacao={sol.situacao} />
         </AdminPageHeader>

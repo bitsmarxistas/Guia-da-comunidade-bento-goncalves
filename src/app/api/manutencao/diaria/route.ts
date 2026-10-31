@@ -7,6 +7,7 @@ import { atualizarViewAuditoria } from "@/application/auditoria/auditoria.servic
 import { processarFila } from "@/application/media/processar.service";
 import { limparJobsAntigos } from "@/infrastructure/queue/queue.service";
 import { dispararAlerta } from "@/infrastructure/alertas/alerta.service";
+import { encerrarVotacoesVencidas } from "@/application/governanca/encerramento-votacao";
 
 /**
  * Manutenção diária (Vercel Cron → `0 3 * * *`).
@@ -14,9 +15,11 @@ import { dispararAlerta } from "@/infrastructure/alertas/alerta.service";
  * Reúne as rotinas que precisam rodar uma vez por dia, em vez de gastar um cron
  * por tarefa (o plano Hobby da Vercel limita a 2 execuções diárias):
  *   1. expurgo LGPD por retenção (RNF-018 / F9-08);
- *   2. atualização da view materializada de auditoria (RF-063 / F9-06);
- *   3. processamento da fila de mídia (F8-04);
- *   4. limpeza de jobs antigos (> 30 dias).
+ *   2. encerramento das votações com prazo de 24 h vencido (o corte exato
+ *      também é aplicado na leitura e no registro de voto, sem esperar o cron);
+ *   3. atualização da view materializada de auditoria (RF-063 / F9-06);
+ *   4. processamento da fila de mídia (F8-04);
+ *   5. limpeza de jobs antigos (> 30 dias).
  *
  * Cada etapa roda isolada: uma falha não impede as demais e volta no relatório.
  */
@@ -49,6 +52,19 @@ export async function GET(request: NextRequest) {
   };
 
   await executar("expurgoLgpd", () => cronAnonimizacaoAutomatica());
+  await executar("encerrarVotacoesVencidas", async () => {
+    const relatorio = await encerrarVotacoesVencidas();
+    // O relatório já cobre falhas isoladas; transformamos em erro da etapa
+    // para a manutenção responder 207 e disparar o alerta (RNF-031).
+    if (relatorio.falhas.length > 0) {
+      throw new Error(
+        relatorio.falhas
+          .map((falha) => `${falha.votacaoId}: ${falha.erro}`)
+          .join(" | "),
+      );
+    }
+    return relatorio;
+  });
   await executar("atualizarViewAuditoria", () => atualizarViewAuditoria());
   await executar("processarFilaMidia", () => processarFila());
   await executar("limparJobsAntigos", () => limparJobsAntigos());

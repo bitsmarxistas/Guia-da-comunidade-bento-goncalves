@@ -30,6 +30,7 @@ import { revalidatePath } from "next/cache";
 import { getAdmin } from "@/lib/auth";
 import { appendLog } from "@/infrastructure/audit/audit.service";
 import { contextoDaRequisicao } from "@/lib/audit-context";
+import { encerrarVotacoesVencidas } from "@/application/governanca/encerramento-votacao";
 
 const abrirContestacaoSchema = z.object({
   negocioId: z.string().uuid(),
@@ -233,6 +234,10 @@ export async function listarContestacoesAction(
   }
 
   const { negocioId } = parseResult.data;
+
+  // A tela de detalhe da solicitação lista a votação vinculada; encerrar as
+  // vencidas antes da leitura evita mostrar "em votação" depois do prazo.
+  await encerrarVotacoesVencidas();
 
   const contestacoes = await db.query.contestacao.findMany({
     where: (c, { eq }) => eq(c.negocioId, negocioId),

@@ -26,6 +26,12 @@ import { exigirContextoAdmin } from "@/lib/audit-context";
 import { normalizarSlug } from "@/domain/utils/normalizar-slug";
 import { gerarSlugUnico } from "@/domain/utils/gerar-slug-unico";
 import { ErroDominio } from "@/domain/errors/domain-error";
+import { JustificativaObrigatoria } from "@/domain/errors";
+import {
+  motivoBloqueioDecisao,
+  situacaoDecidivel,
+} from "@/domain/solicitacoes/situacao";
+import { situacaoDaDecisao } from "@/domain/solicitacoes/decidir";
 
 const analisarSolicitacaoSchema = z.object({
   solicitacaoId: z.string().uuid(),
@@ -33,6 +39,39 @@ const analisarSolicitacaoSchema = z.object({
   justificativa: z.string().optional(),
   observacoesInternas: z.string().optional(),
 });
+
+interface LocalizacaoProposta {
+  endereco?: string;
+  bairro?: string;
+  areaAtendimento?: string;
+  cep?: string;
+  numero?: string;
+  semPontoComercial?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/**
+ * Traduz o snapshot da solicitação para as colunas de `localizacao`.
+ * O endereço estruturado (CEP/número) e as coordenadas passam a ser gravados
+ * na aprovação — antes só rua, bairro e área chegavam na ficha.
+ */
+function valoresLocalizacao(loc: LocalizacaoProposta) {
+  const temCoordenadas =
+    typeof loc.latitude === "number" && typeof loc.longitude === "number";
+
+  return {
+    endereco: loc.endereco?.trim() || null,
+    bairro: loc.bairro?.trim() || null,
+    areaAtendimento: loc.areaAtendimento?.trim() || null,
+    cep: loc.cep?.trim() || null,
+    numero: loc.numero?.toString().trim() || null,
+    semPontoComercial: Boolean(loc.semPontoComercial),
+    latitude: temCoordenadas ? (loc.latitude as number) : null,
+    longitude: temCoordenadas ? (loc.longitude as number) : null,
+    geocodificadoEm: temCoordenadas ? new Date() : null,
+  };
+}
 
 export async function analisarSolicitacaoAction(
   prevState: unknown,
@@ -71,328 +110,380 @@ export async function analisarSolicitacaoAction(
     return { error: "Solicitação não encontrada" };
   }
 
-  if (sol.situacao !== "recebida" && sol.situacao !== "em_fila_contestacao") {
-    return { error: "Solicitação não pode ser analisada no estado atual" };
+  /*
+   * Quem decide: a máquina ME-01 é a autoridade. Antes esta action aceitava
+   * apenas "recebida"/"em_fila_contestacao" e recusava "em_analise" — o estado
+   * em que a solicitação fica depois de aberta —, então o admin via
+   * "Já analisada" e não conseguia aprovar nada que não fosse recém-chegado.
+   */
+  if (!situacaoDecidivel(sol.situacao)) {
+    return {
+      error:
+        motivoBloqueioDecisao(sol.situacao) ??
+        "Solicitação não pode ser analisada no estado atual.",
+    };
+  }
+
+  let situacaoFinal: string;
+  try {
+    situacaoFinal = situacaoDaDecisao(sol.situacao, decisao, {
+      adminId: contexto.atorId ?? "sistema",
+      justificativa,
+      dadosCompletos: true,
+    });
+  } catch (erro) {
+    if (erro instanceof JustificativaObrigatoria) {
+      return {
+        error:
+          "Justificativa é obrigatória para reprovar ou solicitar correção.",
+      };
+    }
+    return {
+      error:
+        erro instanceof Error
+          ? `Não foi possível registrar a decisão: ${erro.message}`
+          : "Não foi possível registrar a decisão.",
+    };
   }
 
   let resultado: { situacao: string; negocioId?: string } = { situacao: "" };
 
-  await db.transaction(async (tx) => {
-    if (decisao === "aprovar") {
-      // Criar negócio a partir dos dados propostos
-      const dados = sol.dadosNegocioProposto as Record<string, unknown>;
+  try {
+    await db.transaction(async (tx) => {
+      if (decisao === "aprovar") {
+        // Criar negócio a partir dos dados propostos
+        const dados = sol.dadosNegocioProposto as Record<string, unknown>;
 
-      if (sol.tipo === "atualizacao" && sol.negocioId) {
-        /**
-         * Correção aprovada = MODIFICAR o comércio existente.
-         * Antes, aprovar uma solicitação do tipo "atualizacao" criava um segundo
-         * cadastro do mesmo comércio (o fluxo só sabia inserir). Aqui o pedido
-         * de correção atualiza a ficha e mantém o slug/URL estável.
-         */
-        const [alvo] = await tx
-          .select({
-            id: negocio.id,
-            nome: negocio.nome,
-            descricao: negocio.descricao,
-          })
-          .from(negocio)
-          .where(eq(negocio.id, sol.negocioId))
-          .limit(1);
+        if (sol.tipo === "atualizacao" && sol.negocioId) {
+          /**
+           * Correção aprovada = MODIFICAR o comércio existente.
+           * Antes, aprovar uma solicitação do tipo "atualizacao" criava um segundo
+           * cadastro do mesmo comércio (o fluxo só sabia inserir). Aqui o pedido
+           * de correção atualiza a ficha e mantém o slug/URL estável.
+           */
+          const [alvo] = await tx
+            .select({
+              id: negocio.id,
+              nome: negocio.nome,
+              descricao: negocio.descricao,
+            })
+            .from(negocio)
+            .where(eq(negocio.id, sol.negocioId))
+            .limit(1);
 
-        if (!alvo) {
-          throw new ErroDominio(
-            "NEGOCIO_INEXISTENTE",
-            "O comércio desta correção não existe mais.",
-          );
-        }
+          if (!alvo) {
+            throw new ErroDominio(
+              "NEGOCIO_INEXISTENTE",
+              "O comércio desta correção não existe mais.",
+            );
+          }
 
-        const snapshotAntes = {
-          nome: alvo.nome,
-          descricao: alvo.descricao,
-        };
+          const snapshotAntes = {
+            nome: alvo.nome,
+            descricao: alvo.descricao,
+          };
 
-        await tx
-          .update(negocio)
-          .set({
-            nome: (dados.nome as string) ?? alvo.nome,
-            descricao: (dados.descricao as string) ?? alvo.descricao,
-            atualizadoEm: new Date(),
-          })
-          .where(eq(negocio.id, alvo.id));
+          await tx
+            .update(negocio)
+            .set({
+              nome: (dados.nome as string) ?? alvo.nome,
+              descricao: (dados.descricao as string) ?? alvo.descricao,
+              atualizadoEm: new Date(),
+            })
+            .where(eq(negocio.id, alvo.id));
 
-        await tx.delete(contato).where(eq(contato.negocioId, alvo.id));
-        for (const c of (dados.contatos as Array<{
-          tipo: string;
-          valor: string;
-          ordem: number;
-        }>) ?? []) {
-          await tx.insert(contato).values({
-            negocioId: alvo.id,
-            tipo: c.tipo,
-            valor: c.valor,
-            ordem: c.ordem,
-          });
-        }
-
-        await tx.delete(localizacao).where(eq(localizacao.negocioId, alvo.id));
-        if (dados.localizacao) {
-          const loc = dados.localizacao as Record<string, string>;
-          await tx.insert(localizacao).values({
-            negocioId: alvo.id,
-            endereco: loc.endereco,
-            bairro: loc.bairro,
-            areaAtendimento: loc.areaAtendimento,
-          });
-        }
-
-        await tx
-          .delete(horarioFuncionamento)
-          .where(eq(horarioFuncionamento.negocioId, alvo.id));
-        for (const h of (dados.horarios as Array<{
-          diaSemana: number;
-          horaAbertura: string;
-          horaFechamento: string;
-          observacao?: string;
-        }>) ?? []) {
-          await tx.insert(horarioFuncionamento).values({
-            negocioId: alvo.id,
-            diaSemana: h.diaSemana,
-            horaAbertura: h.horaAbertura,
-            horaFechamento: h.horaFechamento,
-            observacao: h.observacao,
-          });
-        }
-
-        await tx
-          .delete(negocioCategoria)
-          .where(eq(negocioCategoria.negocioId, alvo.id));
-        for (const catId of (dados.categoriasIds as string[]) ?? []) {
-          await tx.insert(negocioCategoria).values({
-            negocioId: alvo.id,
-            categoriaId: catId,
-          });
-        }
-
-        await tx
-          .update(solicitacao)
-          .set({
-            situacao: "aprovada",
-            analisadaEm: new Date(),
-            observacoesInternas,
-          })
-          .where(eq(solicitacao.id, solicitacaoId));
-
-        resultado = { situacao: "aprovada", negocioId: alvo.id };
-
-        await tx.insert(logSolicitacaoAnalisada).values({
-          atorTipo: "admin",
-          atorId: contexto.atorId,
-          solicitacaoId,
-          decisao: "aprovar",
-          justificativa,
-          negocioId: alvo.id,
-        });
-
-        await tx.insert(logNegocio).values({
-          atorTipo: "admin",
-          atorId: contexto.atorId,
-          negocioId: alvo.id,
-          acao: "atualizar_via_solicitacao",
-          snapshotAntes: JSON.stringify(snapshotAntes),
-          snapshotDepois: JSON.stringify(dados),
-        });
-      } else {
-        // Gerar slug único
-        const baseSlug = dados.nome
-          ? normalizarSlug(dados.nome as string)
-          : "sem-nome";
-        const existentes = new Set(
-          (await tx.select({ slug: negocio.slug }).from(negocio)).map(
-            (n) => n.slug,
-          ),
-        );
-        const slugUnico = gerarSlugUnico(baseSlug, existentes);
-
-        const [novoNegocio] = await tx
-          .insert(negocio)
-          .values({
-            slug: slugUnico,
-            nome: dados.nome as string,
-            descricao: dados.descricao as string,
-            situacaoPublicacao: "publicado",
-            fonte: "solicitacao_publica",
-            solicitacaoOrigemId: sol.id,
-          })
-          .returning();
-
-        if (!novoNegocio) throw new Error("Falha ao criar negócio");
-
-        // Criar contatos
-        const contatosData =
-          (dados.contatos as Array<{
+          await tx.delete(contato).where(eq(contato.negocioId, alvo.id));
+          for (const c of (dados.contatos as Array<{
             tipo: string;
             valor: string;
             ordem: number;
-          }>) || [];
-        for (const c of contatosData) {
-          await tx.insert(contato).values({
-            negocioId: novoNegocio.id,
-            tipo: c.tipo,
-            valor: c.valor,
-            ordem: c.ordem,
-          });
-        }
+          }>) ?? []) {
+            await tx.insert(contato).values({
+              negocioId: alvo.id,
+              tipo: c.tipo,
+              valor: c.valor,
+              ordem: c.ordem,
+            });
+          }
 
-        // Criar localização se houver
-        if (dados.localizacao) {
-          const loc = dados.localizacao as Record<string, string>;
-          await tx.insert(localizacao).values({
-            negocioId: novoNegocio.id,
-            endereco: loc.endereco,
-            bairro: loc.bairro,
-            areaAtendimento: loc.areaAtendimento,
-          });
-        }
+          await tx
+            .delete(localizacao)
+            .where(eq(localizacao.negocioId, alvo.id));
+          if (dados.localizacao) {
+            await tx.insert(localizacao).values({
+              negocioId: alvo.id,
+              ...valoresLocalizacao(dados.localizacao as LocalizacaoProposta),
+            });
+          }
 
-        // Criar horários se houver
-        const horariosData =
-          (dados.horarios as Array<{
+          await tx
+            .delete(horarioFuncionamento)
+            .where(eq(horarioFuncionamento.negocioId, alvo.id));
+          for (const h of (dados.horarios as Array<{
             diaSemana: number;
             horaAbertura: string;
             horaFechamento: string;
             observacao?: string;
-          }>) || [];
-        for (const h of horariosData) {
-          await tx.insert(horarioFuncionamento).values({
-            negocioId: novoNegocio.id,
-            diaSemana: h.diaSemana,
-            horaAbertura: h.horaAbertura,
-            horaFechamento: h.horaFechamento,
-            observacao: h.observacao,
-          });
-        }
-
-        // Vincular categorias
-        const categoriasIds = (dados.categoriasIds as string[]) || [];
-        for (const catId of categoriasIds) {
-          await tx.insert(negocioCategoria).values({
-            negocioId: novoNegocio.id,
-            categoriaId: catId,
-          });
-        }
-
-        // Processar sugestão de categoria se houver
-        if (sol.sugestaoCategoria && sol.sugestaoCategoria.length > 0) {
-          const sug = sol.sugestaoCategoria[0];
-          if (sug.situacao === "aceita" && sug.categoriaCriadaId) {
-            await tx.insert(negocioCategoria).values({
-              negocioId: novoNegocio.id,
-              categoriaId: sug.categoriaCriadaId,
+          }>) ?? []) {
+            await tx.insert(horarioFuncionamento).values({
+              negocioId: alvo.id,
+              diaSemana: h.diaSemana,
+              horaAbertura: h.horaAbertura,
+              horaFechamento: h.horaFechamento,
+              observacao: h.observacao,
             });
           }
-        }
 
-        // Atualizar solicitação
+          await tx
+            .delete(negocioCategoria)
+            .where(eq(negocioCategoria.negocioId, alvo.id));
+          for (const catId of (dados.categoriasIds as string[]) ?? []) {
+            await tx.insert(negocioCategoria).values({
+              negocioId: alvo.id,
+              categoriaId: catId,
+            });
+          }
+
+          await tx
+            .update(solicitacao)
+            .set({
+              situacao: situacaoFinal,
+              analisadaEm: new Date(),
+              observacoesInternas,
+            })
+            .where(eq(solicitacao.id, solicitacaoId));
+
+          resultado = { situacao: situacaoFinal, negocioId: alvo.id };
+
+          await tx.insert(logSolicitacaoAnalisada).values({
+            atorTipo: "admin",
+            atorId: contexto.atorId,
+            solicitacaoId,
+            decisao: "aprovar",
+            justificativa,
+            negocioId: alvo.id,
+          });
+
+          await tx.insert(logNegocio).values({
+            atorTipo: "admin",
+            atorId: contexto.atorId,
+            negocioId: alvo.id,
+            acao: "atualizar_via_solicitacao",
+            snapshotAntes: JSON.stringify(snapshotAntes),
+            snapshotDepois: JSON.stringify(dados),
+          });
+        } else {
+          // Gerar slug único
+          const baseSlug = dados.nome
+            ? normalizarSlug(dados.nome as string)
+            : "sem-nome";
+          const existentes = new Set(
+            (await tx.select({ slug: negocio.slug }).from(negocio)).map(
+              (n) => n.slug,
+            ),
+          );
+          const slugUnico = gerarSlugUnico(baseSlug, existentes);
+
+          const [novoNegocio] = await tx
+            .insert(negocio)
+            .values({
+              slug: slugUnico,
+              nome: dados.nome as string,
+              descricao: dados.descricao as string,
+              situacaoPublicacao: "publicado",
+              fonte: "solicitacao_publica",
+              solicitacaoOrigemId: sol.id,
+            })
+            .returning();
+
+          if (!novoNegocio) throw new Error("Falha ao criar negócio");
+
+          // Criar contatos
+          const contatosData =
+            (dados.contatos as Array<{
+              tipo: string;
+              valor: string;
+              ordem: number;
+            }>) || [];
+          for (const c of contatosData) {
+            await tx.insert(contato).values({
+              negocioId: novoNegocio.id,
+              tipo: c.tipo,
+              valor: c.valor,
+              ordem: c.ordem,
+            });
+          }
+
+          // Criar localização se houver
+          if (dados.localizacao) {
+            await tx.insert(localizacao).values({
+              negocioId: novoNegocio.id,
+              ...valoresLocalizacao(dados.localizacao as LocalizacaoProposta),
+            });
+          }
+
+          // Criar horários se houver
+          const horariosData =
+            (dados.horarios as Array<{
+              diaSemana: number;
+              horaAbertura: string;
+              horaFechamento: string;
+              observacao?: string;
+            }>) || [];
+          for (const h of horariosData) {
+            await tx.insert(horarioFuncionamento).values({
+              negocioId: novoNegocio.id,
+              diaSemana: h.diaSemana,
+              horaAbertura: h.horaAbertura,
+              horaFechamento: h.horaFechamento,
+              observacao: h.observacao,
+            });
+          }
+
+          // Vincular categorias
+          const categoriasIds = (dados.categoriasIds as string[]) || [];
+          for (const catId of categoriasIds) {
+            await tx.insert(negocioCategoria).values({
+              negocioId: novoNegocio.id,
+              categoriaId: catId,
+            });
+          }
+
+          // Processar sugestão de categoria se houver
+          if (sol.sugestaoCategoria && sol.sugestaoCategoria.length > 0) {
+            const sug = sol.sugestaoCategoria[0];
+            if (sug.situacao === "aceita" && sug.categoriaCriadaId) {
+              await tx.insert(negocioCategoria).values({
+                negocioId: novoNegocio.id,
+                categoriaId: sug.categoriaCriadaId,
+              });
+            }
+          }
+
+          // Atualizar solicitação
+          await tx
+            .update(solicitacao)
+            .set({
+              situacao: situacaoFinal,
+              negocioId: novoNegocio.id,
+              analisadaEm: new Date(),
+              observacoesInternas,
+            })
+            .where(eq(solicitacao.id, solicitacaoId));
+
+          resultado = { situacao: situacaoFinal, negocioId: novoNegocio.id };
+
+          // Log de auditoria
+          await tx.insert(logSolicitacaoAnalisada).values({
+            atorTipo: "admin",
+            atorId: contexto.atorId,
+            solicitacaoId,
+            decisao: "aprovar",
+            justificativa,
+            negocioId: novoNegocio.id,
+          });
+
+          await tx.insert(logVinculacaoSolicitacao).values({
+            atorTipo: "sistema",
+            solicitacaoId,
+            negocioIdDepois: novoNegocio.id,
+          });
+
+          await tx.insert(logNegocio).values({
+            atorTipo: "sistema",
+            negocioId: novoNegocio.id,
+            acao: "criar_via_solicitacao",
+            snapshotAntes: null,
+            snapshotDepois: JSON.stringify(dados),
+          });
+        }
+      } else if (decisao === "reprovar") {
         await tx
           .update(solicitacao)
           .set({
-            situacao: "aprovada",
-            negocioId: novoNegocio.id,
+            situacao: situacaoFinal,
             analisadaEm: new Date(),
             observacoesInternas,
           })
           .where(eq(solicitacao.id, solicitacaoId));
 
-        resultado = { situacao: "aprovada", negocioId: novoNegocio.id };
+        resultado = { situacao: situacaoFinal };
 
         // Log de auditoria
         await tx.insert(logSolicitacaoAnalisada).values({
           atorTipo: "admin",
           atorId: contexto.atorId,
           solicitacaoId,
-          decisao: "aprovar",
+          decisao: "reprovar",
           justificativa,
-          negocioId: novoNegocio.id,
         });
+      } else if (decisao === "solicitar_correcao") {
+        await tx
+          .update(solicitacao)
+          .set({
+            situacao: situacaoFinal,
+            motivoIncompleta: justificativa,
+            analisadaEm: new Date(),
+            observacoesInternas,
+          })
+          .where(eq(solicitacao.id, solicitacaoId));
 
-        await tx.insert(logVinculacaoSolicitacao).values({
-          atorTipo: "sistema",
+        resultado = { situacao: situacaoFinal };
+
+        // Log de auditoria
+        await tx.insert(logSolicitacaoAnalisada).values({
+          atorTipo: "admin",
+          atorId: contexto.atorId,
           solicitacaoId,
-          negocioIdDepois: novoNegocio.id,
-        });
-
-        await tx.insert(logNegocio).values({
-          atorTipo: "sistema",
-          negocioId: novoNegocio.id,
-          acao: "criar_via_solicitacao",
-          snapshotAntes: null,
-          snapshotDepois: JSON.stringify(dados),
+          decisao: "solicitar_correcao",
+          justificativa,
         });
       }
-    } else if (decisao === "reprovar") {
-      await tx
-        .update(solicitacao)
-        .set({
-          situacao: "reprovada",
-          analisadaEm: new Date(),
-          observacoesInternas,
-        })
-        .where(eq(solicitacao.id, solicitacaoId));
 
-      resultado = { situacao: "reprovada" };
-
-      // Log de auditoria
-      await tx.insert(logSolicitacaoAnalisada).values({
-        atorTipo: "admin",
-        atorId: contexto.atorId,
-        solicitacaoId,
-        decisao: "reprovar",
-        justificativa,
-      });
-    } else if (decisao === "solicitar_correcao") {
-      await tx
-        .update(solicitacao)
-        .set({
-          situacao: "incompleta",
-          motivoIncompleta: justificativa,
-          analisadaEm: new Date(),
-          observacoesInternas,
-        })
-        .where(eq(solicitacao.id, solicitacaoId));
-
-      resultado = { situacao: "incompleta" };
-
-      // Log de auditoria
-      await tx.insert(logSolicitacaoAnalisada).values({
-        atorTipo: "admin",
-        atorId: contexto.atorId,
-        solicitacaoId,
-        decisao: "solicitar_correcao",
-        justificativa,
-      });
+      // Índice consultável de auditoria (RF-062): uma linha por decisão.
+      await appendLog(
+        {
+          ...contexto,
+          acao: `decidir_solicitacao_${decisao}`,
+          entidadeTipo: "solicitacao",
+          entidadeId: solicitacaoId,
+          detalhes: {
+            decisao,
+            justificativa: justificativa ?? null,
+            situacaoResultante: resultado.situacao,
+          },
+          snapshotAntes: { situacao: sol.situacao },
+          snapshotDepois: {
+            situacao: resultado.situacao,
+            negocioId: resultado.negocioId ?? null,
+          },
+        },
+        tx,
+      );
+    });
+  } catch (erro) {
+    // Erro de domínio (ex.: comércio da correção não existe mais) vira mensagem
+    // na tela; qualquer outra falha aborta a transação inteira e nada é gravado.
+    if (erro instanceof ErroDominio) {
+      return { error: erro.message };
     }
+    console.error("[Análise] Falha ao registrar decisão:", erro);
+    return {
+      error:
+        "Falha ao registrar a decisão. Nada foi alterado — tente novamente.",
+    };
+  }
 
-    // Índice consultável de auditoria (RF-062): uma linha por decisão.
-    await appendLog(
-      {
-        ...contexto,
-        acao: `decidir_solicitacao_${decisao}`,
-        entidadeTipo: "solicitacao",
-        entidadeId: solicitacaoId,
-        detalhes: {
-          decisao,
-          justificativa: justificativa ?? null,
-          situacaoResultante: resultado.situacao,
-        },
-        snapshotAntes: { situacao: sol.situacao },
-        snapshotDepois: {
-          situacao: resultado.situacao,
-          negocioId: resultado.negocioId ?? null,
-        },
-      },
-      tx,
-    );
-  });
+  // Slug para o link "ver a ficha": a rota pública é /negocio/[slug], não /[id].
+  let negocioSlug: string | undefined;
+  if (resultado.negocioId) {
+    const [alvo] = await db
+      .select({ slug: negocio.slug })
+      .from(negocio)
+      .where(eq(negocio.id, resultado.negocioId))
+      .limit(1);
+    negocioSlug = alvo?.slug;
+  }
 
   // Enviar e-mail transacional
   if (sol.solicitante) {
@@ -436,5 +527,6 @@ export async function analisarSolicitacaoAction(
     success: true,
     situacao: resultado?.situacao,
     negocioId: resultado?.negocioId,
+    negocioSlug,
   };
 }

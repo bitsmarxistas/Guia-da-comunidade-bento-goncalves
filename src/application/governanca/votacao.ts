@@ -34,11 +34,20 @@ import { revalidatePath } from "next/cache";
 import { getAdmin } from "@/lib/auth";
 import { appendLog } from "@/infrastructure/audit/audit.service";
 import { contextoDaRequisicao } from "@/lib/audit-context";
+import {
+  calcularEncerramento,
+  calcularHorasRestantes,
+  DURACAO_VOTACAO_HORAS,
+} from "@/domain/votacao/duracao";
+import { votacaoVencida } from "@/domain/votacao/encerramento";
+import {
+  aplicarEncerramentoVotacao,
+  encerrarVotacoesVencidas,
+} from "@/application/governanca/encerramento-votacao";
 
 const abrirVotacaoSchema = z.object({
   contestacaoId: z.string().uuid(),
   pergunta: z.string().min(5).max(1000),
-  encerraEm: z.string().datetime(),
 });
 
 export async function abrirVotacaoAction(
@@ -52,7 +61,6 @@ export async function abrirVotacaoAction(
   const rawData = {
     contestacaoId: formData.get("contestacaoId"),
     pergunta: formData.get("pergunta"),
-    encerraEm: formData.get("encerraEm"),
   };
 
   const parseResult = abrirVotacaoSchema.safeParse(rawData);
@@ -63,7 +71,7 @@ export async function abrirVotacaoAction(
     return { error: errorMsg || "Dados inválidos" };
   }
 
-  const { contestacaoId, pergunta, encerraEm } = parseResult.data;
+  const { contestacaoId, pergunta } = parseResult.data;
 
   const cont = await db.query.contestacao.findFirst({
     where: (c, { eq }) => eq(c.id, contestacaoId),
@@ -96,6 +104,12 @@ export async function abrirVotacaoAction(
     return { error: "Autor da contestação não está no quórum" };
   }
 
+  // Regra de produto: o prazo é fixo em 24 h, gravado no mesmo instante da
+  // abertura para garantir `encerraEm = iniciadaEm + 24 h` sem depender do
+  // relógio do banco.
+  const iniciadaEm = new Date();
+  const encerraEm = calcularEncerramento(iniciadaEm);
+
   await db.transaction(async (tx) => {
     const [novaVotacao] = await tx
       .insert(votacaoTable)
@@ -106,7 +120,8 @@ export async function abrirVotacaoAction(
         quorumMinimo: adminIds.size,
         maioriaNecessaria: 50,
         situacao: "em_andamento",
-        encerraEm: new Date(encerraEm),
+        iniciadaEm,
+        encerraEm,
       })
       .returning();
 
@@ -145,7 +160,12 @@ export async function abrirVotacaoAction(
         acao: "abrir_votacao",
         entidadeTipo: "votacao",
         entidadeId: novaVotacao.id,
-        detalhes: { contestacaoId, quorumMinimo: adminIds.size },
+        detalhes: {
+          contestacaoId,
+          quorumMinimo: adminIds.size,
+          duracaoHoras: DURACAO_VOTACAO_HORAS,
+          encerraEm: encerraEm.toISOString(),
+        },
         snapshotDepois: { situacao: "em_andamento" },
       },
       tx,
@@ -264,8 +284,23 @@ export async function registrarVotoAction(
     return { error: "Votação não está aberta para votação" };
   }
 
-  if (new Date(vot.encerraEm) < new Date()) {
-    return { error: "Prazo de votação encerrado" };
+  const agora = new Date();
+
+  if (
+    votacaoVencida(
+      { situacao: "em_andamento", encerraEm: vot.encerraEm },
+      agora,
+    )
+  ) {
+    // Encerramento preguiçoso também no caminho de escrita: se o cron ainda
+    // não rodou, o voto é recusado e a votação já sai encerrada do banco.
+    await encerrarVotacoesVencidas(agora);
+    revalidatePath("/admin/votacoes");
+    revalidatePath("/admin/solicitacoes");
+    if (vot.contestacao) {
+      revalidatePath(`/admin/negocios/${vot.contestacao.negocioId}`);
+    }
+    return { error: "O prazo de 24 horas desta votação terminou." };
   }
 
   const adminIdsAtivos = new Set(
@@ -307,7 +342,7 @@ export async function registrarVotoAction(
       adminId: admin.id,
       escolha,
       estado: "ativo" as const,
-      criadoEm: new Date(),
+      criadoEm: agora,
     },
   ];
 
@@ -390,6 +425,7 @@ export async function apurarVotacaoAction(
 ) {
   const admin = await getAdmin();
   if (!admin) return { error: "Não autorizado" };
+  const contexto = await contextoDaRequisicao("admin", admin.id);
 
   const rawData = {
     votacaoId: formData.get("votacaoId"),
@@ -431,6 +467,33 @@ export async function apurarVotacaoAction(
     return { error: "Votação não está em andamento" };
   }
 
+  const contestacao = vot.contestacao;
+  if (!contestacao) {
+    return { error: "Contestação da votação não encontrada" };
+  }
+
+  const agora = new Date();
+
+  if (
+    votacaoVencida(
+      { situacao: "em_andamento", encerraEm: vot.encerraEm },
+      agora,
+    )
+  ) {
+    // O prazo de 24 h venceu: quem decide o resultado é o encerramento
+    // automático, nunca uma apuração manual tardia.
+    const relatorio = await encerrarVotacoesVencidas(agora);
+    const encerradaAgora = relatorio.encerradas.includes(votacaoId);
+    revalidatePath("/admin/votacoes");
+    revalidatePath("/admin/solicitacoes");
+    revalidatePath(`/admin/negocios/${contestacao.negocioId}`);
+    return {
+      error: encerradaAgora
+        ? "O prazo de 24 horas desta votação terminou; ela foi encerrada automaticamente."
+        : "O prazo de 24 horas desta votação terminou.",
+    };
+  }
+
   const adminIdsAtivos = new Set(
     (
       await db.query.administrador.findMany({
@@ -467,126 +530,37 @@ export async function apurarVotacaoAction(
       return { error: "Quórum incompleto: nem todos os admins ativos votaram" };
     }
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(votacaoTable)
-        .set({
-          situacao: novaSituacaoDomain,
-          encerradaEm: new Date(),
-          resultado: apuracao.situacao,
-          totalVotos: apuracao.aprovacoes + apuracao.rejeicoes,
-          votosSim: apuracao.aprovacoes,
-          votosNao: apuracao.rejeicoes,
-        })
-        .where(eq(votacaoTable.id, votacaoId));
-
-      await tx
-        .update(contestacaoTable)
-        .set({
-          situacao: "encerrada",
-          decididaEm: new Date(),
-        })
-        .where(eq(contestacaoTable.id, vot.contestacaoId));
-
-      await tx.insert(logVotacao).values({
-        atorTipo: "admin",
-        atorId: admin.id,
+    const aplicado = await db.transaction((tx) =>
+      aplicarEncerramentoVotacao(tx, {
         votacaoId,
-        acao: "apurar",
-        situacaoAnterior: "em_andamento",
-        situacaoNova: novaSituacaoDomain,
-        resultado: apuracao.situacao,
-        totalVotos: apuracao.aprovacoes + apuracao.rejeicoes,
-      } satisfies typeof logVotacao.$inferInsert);
+        contestacaoId: contestacao.id,
+        negocioId: contestacao.negocioId,
+        solicitacaoOrigemId: contestacao.solicitacaoOrigemId ?? null,
+        resultado: {
+          situacao: novaSituacaoDomain,
+          aprovacoes: apuracao.aprovacoes,
+          rejeicoes: apuracao.rejeicoes,
+          totalVotos: apuracao.aprovacoes + apuracao.rejeicoes,
+          quorumCompleto: true,
+        },
+        contexto: {
+          atorTipo: "admin",
+          atorId: admin.id,
+          ipOrigem: contexto.ipOrigem,
+          userAgent: contexto.userAgent,
+        },
+        agora,
+        exigirPrazoVencido: false,
+        acaoLog: "apurar",
+      }),
+    );
 
-      await tx.insert(logContestacao).values({
-        atorTipo: "admin",
-        atorId: admin.id,
-        contestacaoId: vot.contestacaoId,
-        acao: "encerrar",
-        situacaoAnterior: "em_votacao",
-        situacaoNova: "encerrada",
-      } satisfies typeof logContestacao.$inferInsert);
-
-      const contestacao = vot.contestacao;
-      if (contestacao) {
-        if (contestacao.solicitacaoOrigemId) {
-          const sol = await tx.query.solicitacao.findFirst({
-            where: (s, { eq }) => eq(s.id, contestacao.solicitacaoOrigemId!),
-          });
-
-          if (sol) {
-            try {
-              const novaSituacao = transicionarSolicitacao(
-                sol.situacao as any,
-                "CONCLUIR_VOTACAO",
-                {
-                  resultadoVotacao: apuracao.situacao as
-                    "aprovada" | "rejeitada" | "sem_aprovacao",
-                },
-              );
-
-              await tx
-                .update(solicitacaoTable)
-                .set({ situacao: novaSituacao })
-                .where(
-                  eq(solicitacaoTable.id, contestacao.solicitacaoOrigemId!),
-                );
-
-              await tx.insert(logSolicitacaoAnalisada).values({
-                atorTipo: "sistema",
-                solicitacaoId: contestacao.solicitacaoOrigemId!,
-                decisao: `votacao_${apuracao.situacao}`,
-                justificativa: `Votação concluída: ${apuracao.aprovacoes} a favor, ${apuracao.rejeicoes} contra`,
-              } satisfies typeof logSolicitacaoAnalisada.$inferInsert);
-            } catch (e) {
-              if (!(e instanceof ErroTransicaoInvalida)) throw e;
-            }
-          }
-
-          if (apuracao.situacao === "aprovada") {
-            await tx
-              .update(negocioTable)
-              .set({ situacaoPublicacao: "publicado" })
-              .where(eq(negocioTable.id, contestacao.negocioId));
-
-            await tx.insert(logNegocio).values({
-              atorTipo: "sistema",
-              negocioId: contestacao.negocioId,
-              acao: "votacao_aprovada",
-              snapshotAntes: JSON.stringify({
-                situacaoPublicacao: "oculto_contestacao",
-              }),
-              snapshotDepois: JSON.stringify({
-                situacaoPublicacao: "publicado",
-              }),
-            } satisfies typeof logNegocio.$inferInsert);
-          } else {
-            await tx
-              .update(negocioTable)
-              .set({ situacaoPublicacao: "nao_publicado" })
-              .where(eq(negocioTable.id, contestacao.negocioId));
-
-            await tx.insert(logNegocio).values({
-              atorTipo: "sistema",
-              negocioId: contestacao.negocioId,
-              acao: "votacao_rejeitada_ou_empate",
-              snapshotAntes: JSON.stringify({
-                situacaoPublicacao: "oculto_contestacao",
-              }),
-              snapshotDepois: JSON.stringify({
-                situacaoPublicacao: "nao_publicado",
-              }),
-            } satisfies typeof logNegocio.$inferInsert);
-          }
-        }
-      }
-    });
+    if (!aplicado) {
+      return { error: "Votação já foi encerrada" };
+    }
 
     revalidatePath("/admin/solicitacoes");
-    if (vot.contestacao) {
-      revalidatePath(`/admin/negocios/${vot.contestacao.negocioId}`);
-    }
+    revalidatePath(`/admin/negocios/${contestacao.negocioId}`);
     // A tela /admin/votacoes mostra a situação/resultado após a apuração.
     revalidatePath("/admin/votacoes");
 
@@ -620,6 +594,11 @@ export async function detalharVotacaoAction(
   }
 
   const { votacaoId } = parseResult.data;
+
+  // A leitura detalhada também aplica o encerramento preguiçoso: quem abre o
+  // detalhe depois do prazo vê a votação já encerrada, sem esperar o cron.
+  const agora = new Date();
+  await encerrarVotacoesVencidas(agora);
 
   const vot = await db.query.votacao.findFirst({
     where: (v, { eq }) => eq(v.id, votacaoId),
@@ -658,11 +637,25 @@ export async function detalharVotacaoAction(
     (a: { id: string }) => !votaram.has(a.id),
   );
 
+  const encerrada =
+    vot.situacao !== "em_andamento" ||
+    votacaoVencida(
+      { situacao: "em_andamento", encerraEm: vot.encerraEm },
+      agora,
+    );
+  const duracaoHoras = Math.round(
+    (vot.encerraEm.getTime() - vot.iniciadaEm.getTime()) / 3_600_000,
+  );
+
   return {
     success: true,
     votacao: {
       ...vot,
       situacaoDomain: vot.situacao,
+      encerrada,
+      horasRestantes: calcularHorasRestantes(vot.encerraEm, agora),
+      duracaoHoras,
+      prazoFixo: duracaoHoras === DURACAO_VOTACAO_HORAS,
     },
     adminsAtivos,
     naoVotaram,

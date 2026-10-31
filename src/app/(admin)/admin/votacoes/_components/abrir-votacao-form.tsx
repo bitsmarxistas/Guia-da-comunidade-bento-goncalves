@@ -6,7 +6,6 @@ import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { abrirVotacaoAction } from "@/application/governanca/votacao";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/components/alert";
 import { Button } from "@/ui/components/button";
-import { Input } from "@/ui/components/input";
 import { Label } from "@/ui/components/label";
 import { NativeSelect } from "@/ui/components/native-select";
 import { Textarea } from "@/ui/components/textarea";
@@ -25,24 +24,6 @@ async function abrirVotacao(
   prevState: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
-  const encerraEm = formData.get("encerraEm");
-
-  if (typeof encerraEm === "string" && encerraEm.length > 0) {
-    const data = new Date(encerraEm);
-
-    if (Number.isNaN(data.getTime())) {
-      return { error: "Informe uma data e hora válidas para o encerramento." };
-    }
-
-    if (data.getTime() <= Date.now()) {
-      return { error: "O encerramento deve ser no futuro." };
-    }
-
-    // O input datetime-local não envia timezone; o navegador interpreta o
-    // valor no fuso local e aqui ele vai para a action já em ISO UTC.
-    formData.set("encerraEm", data.toISOString());
-  }
-
   const resultado = await abrirVotacaoAction(prevState, formData);
 
   if ("error" in resultado) {
@@ -87,7 +68,7 @@ export function AbrirVotacaoForm({
           <AlertTitle className="text-positive">Votação aberta</AlertTitle>
           <AlertDescription>
             A votação já aparece na lista abaixo, com o quórum congelado no
-            momento da abertura.
+            momento da abertura. O encerramento é automático em 24 horas.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -130,20 +111,10 @@ export function AbrirVotacaoForm({
         </p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="encerraEm">Encerra em</Label>
-        <Input
-          id="encerraEm"
-          name="encerraEm"
-          type="datetime-local"
-          required
-          disabled={semContestacoes || pendente}
-          className="h-10"
-        />
-        <p className="text-xs text-ink-mute">
-          O prazo é interpretado no fuso do seu navegador; deve ser no futuro.
-        </p>
-      </div>
+      <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink-soft">
+        O prazo é fixo: a votação encerra automaticamente 24 horas após a
+        abertura. Não é possível escolher outra data.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button

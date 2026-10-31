@@ -21,30 +21,48 @@ import {
   logVinculacaoSolicitacao,
 } from "@/infrastructure/db/schema/logs";
 
+const TelefoneOpcional = z
+  .string()
+  .optional()
+  .transform((valor) => (valor ?? "").replace(/\D/g, ""))
+  .refine(
+    (digitos) =>
+      digitos.length === 0 || (digitos.length >= 10 && digitos.length <= 11),
+    {
+      message:
+        "Telefone deve ter DDD + número (10 ou 11 dígitos), ou ficar em branco.",
+    },
+  );
+
 const atualizarSolicitacaoSchema = z.object({
   // Dados do solicitante
-  nomeSolicitante: z.string().min(1).max(120),
-  email: z.string().email(),
-  telefone: z.string().min(10).max(20),
+  nomeSolicitante: z.string().min(1, "Informe seu nome.").max(120),
+  email: z.string().email("Informe um e-mail válido."),
+  telefone: TelefoneOpcional,
   // Dados do negócio
-  nomeNegocio: z.string().min(1).max(150),
-  descricao: z.string().min(1),
+  nomeNegocio: z.string().min(1, "Informe o nome do comércio.").max(150),
+  descricao: z.string().min(1, "Descreva o comércio."),
   contatos: z
     .array(
       z.object({
         tipo: z.enum(["whatsapp", "telefone", "instagram", "email", "outro"]),
-        valor: z.string().min(1),
+        valor: z.string().min(1, "Contato vazio."),
         ordem: z.number().default(0),
       }),
     )
-    .min(1),
+    .min(1, "Informe ao menos um contato do comércio."),
   categoriasIds: z.array(z.string().uuid()).optional(),
   sugestaoCategoria: z.string().max(150).optional(),
   localizacao: z
     .object({
-      endereco: z.string().optional(),
+      endereco: z.string().max(200).optional(),
       bairro: z.string().max(80).optional(),
-      areaAtendimento: z.string().optional(),
+      areaAtendimento: z.string().max(200).optional(),
+      cep: z.string().max(9).optional(),
+      numero: z.string().max(20).optional(),
+      semPontoComercial: z.boolean().optional(),
+      latitude: z.number().min(-90).max(90).nullable().optional(),
+      longitude: z.number().min(-180).max(180).nullable().optional(),
     })
     .optional(),
   horarios: z
@@ -60,7 +78,7 @@ const atualizarSolicitacaoSchema = z.object({
   // Comércio que está sendo corrigido (obrigatório no fluxo de correção).
   negocioId: z.string().uuid().optional(),
   // Declaração e aceite
-  declaracaoVinculo: z.string().min(1),
+  declaracaoVinculo: z.string().min(1, "Declare seu vínculo com o comércio."),
   aceiteTermos: z
     .boolean()
     .refine((v) => v === true, "É obrigatório aceitar os termos"),
@@ -104,10 +122,11 @@ export async function criarSolicitacaoAtualizacaoAction(
 
   const parseResult = atualizarSolicitacaoSchema.safeParse(rawData);
   if (!parseResult.success) {
-    const errorMsg = Object.values(parseResult.error.flatten().fieldErrors)
+    // Um erro por vez: concatenar tudo virava uma frase ilegível na tela.
+    const primeiro = Object.values(parseResult.error.flatten().fieldErrors)
       .flat()
-      .join(", ");
-    return { error: errorMsg || "Dados inválidos" };
+      .find((mensagem): mensagem is string => Boolean(mensagem));
+    return { error: primeiro || "Confira os dados e tente novamente." };
   }
 
   const data = parseResult.data;

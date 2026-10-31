@@ -18,44 +18,32 @@ import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 
-const SITUACOES = [
-  { value: "recebida", label: "Recebida" },
-  { value: "em_fila_contestacao", label: "Em fila contestação" },
-  { value: "aprovada", label: "Aprovada" },
-  { value: "reprovada", label: "Reprovada" },
-  { value: "incompleta", label: "Incompleta" },
-] as const;
+import {
+  SITUACOES_SOLICITACAO,
+  classeSituacao,
+  rotuloSituacao,
+} from "@/domain/solicitacoes/situacao";
+
+/**
+ * O filtro oferece TODAS as situações do domínio. Antes a lista tinha
+ * "reprovada" (estado inexistente) e não tinha "em análise", "aguardando
+ * correção", "em votação" nem "rejeitada" — filtrar por qualquer uma delas
+ * nunca retornava nada.
+ */
+const SITUACOES = SITUACOES_SOLICITACAO.map((valor) => ({
+  value: valor,
+  label: rotuloSituacao(valor),
+}));
 
 const TIPOS = [
   { value: "inclusao", label: "Inclusão" },
   { value: "atualizacao", label: "Atualização" },
 ] as const;
 
-const SITUACAO_CLASSES: Record<string, string> = {
-  recebida: "border-brand/20 bg-brand-tint text-brand-strong",
-  em_fila_contestacao: "border-warning/30 bg-warning-tint text-warning",
-  aprovada: "border-positive/30 bg-positive-tint text-positive",
-  reprovada: "border-critical/30 bg-critical-tint text-critical",
-  incompleta: "border-line bg-surface-2 text-ink-soft",
-};
-
-const SITUACAO_LABELS: Record<string, string> = {
-  recebida: "Recebida",
-  em_fila_contestacao: "Em fila",
-  aprovada: "Aprovada",
-  reprovada: "Reprovada",
-  incompleta: "Incompleta",
-};
-
 function SituacaoBadge({ situacao }: { situacao: string }) {
   return (
-    <Badge
-      variant="outline"
-      className={
-        SITUACAO_CLASSES[situacao] ?? "border-line bg-surface-2 text-ink-soft"
-      }
-    >
-      {SITUACAO_LABELS[situacao] || situacao}
+    <Badge variant="outline" className={classeSituacao(situacao)}>
+      {rotuloSituacao(situacao)}
     </Badge>
   );
 }
@@ -198,27 +186,25 @@ export default async function SolicitacoesPage({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  solicitacoes.map((sol: any) => (
+                  solicitacoes.map((sol) => (
                     <TableRow key={sol.id}>
                       <TableCell>
                         <div>
                           <p className="font-medium text-ink">
-                            {sol.dadosNegocioProposto?.nome || "N/A"}
+                            {sol.nomeNegocio || "Sem nome informado"}
                           </p>
-                          <p className="text-sm text-ink-mute">
-                            {sol.tipo === "inclusao"
-                              ? "Inclusão"
-                              : "Atualização"}
+                          <p className="font-mono text-xs text-ink-mute">
+                            {sol.protocolo}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium text-ink">
-                            {sol.solicitante?.nome || "N/A"}
+                            {sol.nomeSolicitante || "Sem nome"}
                           </p>
                           <p className="text-sm text-ink-mute">
-                            {sol.solicitante?.email || ""}
+                            {sol.emailSolicitante || ""}
                           </p>
                         </div>
                       </TableCell>

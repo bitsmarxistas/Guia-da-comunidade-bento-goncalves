@@ -27,6 +27,7 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { normalizarSlug } from "@/domain/utils/normalizar-slug";
 import { gerarSlugUnico } from "@/domain/utils/gerar-slug-unico";
+import { calcularEncerramento } from "@/domain/votacao/duracao";
 
 async function seedCompleto() {
   console.log("🌱 Iniciando seed completo...\n");
@@ -644,6 +645,8 @@ async function seedCompleto() {
         columns: { id: true },
       });
 
+      // Prazo fixo de 24 h, igual à aplicação (src/domain/votacao/duracao.ts).
+      const iniciadaEm = new Date();
       await db.insert(votacao).values({
         contestacaoId: novaContestacao.id,
         pergunta: "A solicitação deve ser mantida como aprovada?",
@@ -651,7 +654,8 @@ async function seedCompleto() {
         quorumMinimo: adminsAtivos.length,
         maioriaNecessaria: 50,
         situacao: "em_andamento",
-        encerraEm: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
+        iniciadaEm,
+        encerraEm: calcularEncerramento(iniciadaEm),
       });
 
       console.log("  ✅ Contestação e votação criadas");
