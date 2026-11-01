@@ -82,8 +82,12 @@ interface ImageUploadProps extends PropsBase {
 
 type FileUploadProps = PropsBase;
 
-const MAX_LADO_IMAGEM = 1600;
-const QUALIDADE_IMAGEM = 0.82;
+/*
+ * 1920 px e qualidade 0.9: 1600/0.82 cabia no limite, mas deixava a foto
+ * visivelmente macia na capa da ficha em telas grandes.
+ */
+const MAX_LADO_IMAGEM = 1920;
+const QUALIDADE_IMAGEM = 0.9;
 
 function formatarTamanho(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

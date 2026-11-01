@@ -70,6 +70,8 @@ const nextConfig: NextConfig = {
    * renderizar um host que o otimizador recusaria.
    */
   images: {
+    // Qualidade 90 nas fotos de comércio: 75 (padrão) borrava retrato na capa.
+    qualities: [75, 90],
     remotePatterns: [
       { protocol: "https", hostname: "assets.seudominio.com.br" },
       // Bucket público do R2 (R2_PUBLIC_URL: https://pub-….r2.dev).

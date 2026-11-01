@@ -28,12 +28,15 @@ export function ImagemNegocio({
   sizes,
   prioridade = false,
   className = "object-cover",
+  qualidade = 90,
 }: {
   url: string;
   alt: string;
   sizes: string;
   prioridade?: boolean;
   className?: string;
+  /** O padrão do Next (75) borrava foto de rosto na capa da ficha. */
+  qualidade?: number;
 }) {
   return (
     <Image
@@ -42,6 +45,7 @@ export function ImagemNegocio({
       fill
       sizes={sizes}
       priority={prioridade}
+      quality={qualidade}
       className={className}
     />
   );

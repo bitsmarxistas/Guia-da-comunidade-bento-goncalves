@@ -74,6 +74,43 @@ function valoresLocalizacao(loc: LocalizacaoProposta) {
   };
 }
 
+/**
+ * Campos de `localizacao` que o chamado realmente trouxe.
+ *
+ * Correção é pedido pontual: o formulário manda só rua e bairro. Aplicar o
+ * snapshot inteiro zerava área de atendimento, "sem ponto comercial", CEP e
+ * coordenadas de quem só queria corrigir a descrição.
+ */
+function camposEnviadosDeLocalizacao(loc: LocalizacaoProposta) {
+  const patch: Partial<typeof localizacao.$inferInsert> = {};
+
+  if (loc.endereco !== undefined) {
+    patch.endereco = loc.endereco.trim() || null;
+  }
+  if (loc.bairro !== undefined) {
+    patch.bairro = loc.bairro.trim() || null;
+  }
+  if (loc.areaAtendimento !== undefined) {
+    patch.areaAtendimento = loc.areaAtendimento.trim() || null;
+  }
+  if (loc.cep !== undefined) {
+    patch.cep = loc.cep.trim() || null;
+  }
+  if (loc.numero !== undefined) {
+    patch.numero = loc.numero?.toString().trim() || null;
+  }
+  if (loc.semPontoComercial !== undefined) {
+    patch.semPontoComercial = Boolean(loc.semPontoComercial);
+  }
+  if (typeof loc.latitude === "number" && typeof loc.longitude === "number") {
+    patch.latitude = loc.latitude;
+    patch.longitude = loc.longitude;
+    patch.geocodificadoEm = new Date();
+  }
+
+  return patch;
+}
+
 export async function analisarSolicitacaoAction(
   prevState: unknown,
   formData: FormData,
@@ -236,19 +273,16 @@ export async function analisarSolicitacaoAction(
               .limit(1);
 
             if (existente) {
-              await tx
-                .update(localizacao)
-                .set({
-                  endereco: valores.endereco,
-                  bairro: valores.bairro,
-                  areaAtendimento: valores.areaAtendimento,
-                  cep: valores.cep,
-                  numero: valores.numero,
-                  semPontoComercial: valores.semPontoComercial,
-                  latitude: valores.latitude,
-                  longitude: valores.longitude,
-                })
-                .where(eq(localizacao.id, existente.id));
+              const patch = camposEnviadosDeLocalizacao(
+                dados.localizacao as LocalizacaoProposta,
+              );
+
+              if (Object.keys(patch).length > 0) {
+                await tx
+                  .update(localizacao)
+                  .set(patch)
+                  .where(eq(localizacao.id, existente.id));
+              }
             } else {
               await tx.insert(localizacao).values({
                 negocioId: alvo.id,

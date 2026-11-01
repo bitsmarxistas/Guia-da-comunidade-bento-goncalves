@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  CalendarClock,
   Clock,
   ExternalLink,
+  Info,
   Mail,
   MapPin,
   Pencil,
@@ -253,6 +253,39 @@ export default async function NegocioPage({
             minutosAgora < emMinutos(faixa.horaFechamento),
         );
 
+  /*
+   * Texto único para "hoje" e para o status: a pílula da capa e a lateral
+   * precisam dizer exatamente a mesma coisa — antes a ficha mostrava
+   * "Fechado agora" no topo e "Horário não informado" no cartão.
+   */
+  const horarioDeHoje = semHorario
+    ? null
+    : sobAgendamento
+      ? "somente sob agendamento"
+      : faixasHoje.length === 0
+        ? "Fechado hoje"
+        : faixasHoje
+            .map(
+              (faixa) =>
+                `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
+            )
+            .join(" e ");
+
+  const statusTexto = semHorario
+    ? "Horário não informado"
+    : sobAgendamento
+      ? "Somente sob agendamento"
+      : abertoAgora
+        ? "Aberto agora"
+        : "Fechado agora";
+
+  const statusPill = abertoAgora
+    ? "inline-flex items-center gap-1.5 rounded-full bg-positive-tint px-2.5 py-1 text-[13px] font-semibold text-ink"
+    : "inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[13px] font-semibold text-ink-soft";
+  const statusPonto = abertoAgora
+    ? "size-2 rounded-full bg-positive"
+    : "size-2 rounded-full border border-ink-mute";
+
   const categorias = negocio.categorias
     .map((vinculo) => vinculo.categoria)
     .filter(Boolean);
@@ -373,63 +406,58 @@ export default async function NegocioPage({
           <span className="text-ink">{negocio.nome}</span>
         </nav>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-          <div>
-            {/* Galeria: capa 3:2 + até 4 fotos aprovadas */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start lg:gap-8">
+          {/* Coluna principal: identidade do comércio */}
+          <div className="min-w-0">
             <GaleriaNegocio
               nome={negocio.nome}
               categoria={categorias[0]?.nome ?? null}
               imagens={negocio.imagens}
             />
 
-            <div className="mt-6 flex flex-wrap items-center gap-2">
+            <h1 className="h1-editorial mt-4">{negocio.nome}</h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {categorias.map((categoria) => (
                 <Link
                   key={categoria.id}
                   href={`/catalogo?categoria=${categoria.slug}`}
-                  className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:border-brand hover:text-brand"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft transition-colors hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                 >
                   <Tag className="size-3.5" aria-hidden="true" />
                   {categoria.nome}
                 </Link>
               ))}
-              <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-brand-tint px-3 text-[13px] font-semibold text-brand-strong">
+              <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-tint px-3 text-[13px] font-semibold text-brand-strong">
                 <ShieldCheck className="size-3.5" aria-hidden="true" />
                 Do guia
               </span>
             </div>
 
-            <h1 className="h1-editorial mt-4">{negocio.nome}</h1>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-soft">
+            {/*
+              Linha de leitura rápida: bairro, situação e horário de hoje.
+              É o que a pessoa quer saber antes de decidir falar com o comércio.
+            */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
               {negocio.localizacao?.bairro ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1.5 text-ink-soft">
+                  <MapPin className="size-4 text-ink-mute" aria-hidden="true" />
                   {negocio.localizacao.bairro}
                 </span>
               ) : null}
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className={
-                    abertoAgora === null
-                      ? "size-2 rounded-full border border-ink-mute"
-                      : abertoAgora
-                        ? "size-2 rounded-full bg-positive"
-                        : "size-2 rounded-full bg-ink-mute"
-                  }
-                />
-                {sobAgendamento
-                  ? "Somente sob agendamento"
-                  : abertoAgora === null
-                    ? "Horário não informado"
-                    : abertoAgora
-                      ? "Aberto agora"
-                      : "Fechado agora"}
+              <span className={statusPill}>
+                <span aria-hidden="true" className={statusPonto} />
+                {statusTexto}
               </span>
+              {horarioDeHoje ? (
+                <span className="inline-flex items-center gap-1.5 text-ink-soft">
+                  <Clock className="size-4 text-ink-mute" aria-hidden="true" />
+                  Hoje: {horarioDeHoje}
+                </span>
+              ) : null}
             </div>
 
-            <p className="leitura mt-6 text-lg leading-relaxed text-ink-soft">
+            <p className="leitura mt-5 text-lg leading-relaxed text-ink-soft">
               {negocio.descricao}
             </p>
 
@@ -452,273 +480,225 @@ export default async function NegocioPage({
                 text={negocio.descricao}
               />
             </div>
-
-            {/* Contatos — nada de campo vazio */}
-            {telefones.length +
-              emails.length +
-              instagrams.length +
-              sites.length >
-            0 ? (
-              <section className="mt-10" aria-labelledby="contatos">
-                <h2
-                  id="contatos"
-                  className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
-                >
-                  Contatos
-                </h2>
-                <ul className="mt-3 divide-y divide-line border-y border-line">
-                  {telefones.map((contato) => (
-                    <li
-                      key={contato.id}
-                      className="flex items-center gap-3 py-3"
-                    >
-                      <Phone
-                        className="size-4 text-ink-mute"
-                        aria-hidden="true"
-                      />
-                      <a
-                        href={`tel:${contato.valor.replace(/\D/g, "")}`}
-                        className="text-sm font-medium text-ink hover:text-brand"
-                      >
-                        {formatarTelefone(contato.valor)}
-                      </a>
-                    </li>
-                  ))}
-                  {emails.map((contato) => (
-                    <li
-                      key={contato.id}
-                      className="flex items-center gap-3 py-3"
-                    >
-                      <Mail
-                        className="size-4 text-ink-mute"
-                        aria-hidden="true"
-                      />
-                      <a
-                        href={`mailto:${contato.valor}`}
-                        className="text-sm font-medium text-ink hover:text-brand"
-                      >
-                        {contato.valor}
-                      </a>
-                    </li>
-                  ))}
-                  {instagrams.map((contato) => (
-                    <li
-                      key={contato.id}
-                      className="flex items-center gap-3 py-3"
-                    >
-                      <GlifoInstagram className="size-4 text-ink-mute" />
-                      <a
-                        href={`https://instagram.com/${contato.valor.replace(/^@/, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-ink hover:text-brand"
-                      >
-                        @{contato.valor.replace(/^@/, "")}
-                      </a>
-                    </li>
-                  ))}
-                  {sites.map((contato) => (
-                    <li
-                      key={contato.id}
-                      className="flex items-center gap-3 py-3"
-                    >
-                      <ExternalLink
-                        className="size-4 text-ink-mute"
-                        aria-hidden="true"
-                      />
-                      <a
-                        href={
-                          contato.valor.startsWith("http")
-                            ? contato.valor
-                            : `https://${contato.valor}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-ink hover:text-brand"
-                      >
-                        {contato.valor.replace(/^https?:\/\//, "")}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-xs text-ink-mute">
-                  O WhatsApp é o contato do comércio. A equipe do guia não
-                  responde por lá.
-                </p>
-              </section>
-            ) : null}
-
-            {/* Horários */}
-            <section className="mt-10" aria-labelledby="horarios">
-              <h2
-                id="horarios"
-                className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
-              >
-                Horários
-              </h2>
-
-              {negocio.horarios.length === 0 ? (
-                <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
-                  <Clock className="size-4 text-ink-mute" aria-hidden="true" />
-                  Horário não informado.
-                </p>
-              ) : sobAgendamento ? (
-                <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
-                  <CalendarClock
-                    className="size-4 text-ink-mute"
-                    aria-hidden="true"
-                  />
-                  Atendimento somente sob agendamento.
-                </p>
-              ) : (
-                <table className="mt-3 w-full border-collapse text-sm">
-                  <caption className="sr-only">
-                    Horário de funcionamento de {negocio.nome}
-                  </caption>
-                  <tbody>
-                    {DIAS.map((dia, indice) => {
-                      const faixas = porDia.get(indice) ?? [];
-                      const ehHoje = indice === diaAtual;
-                      return (
-                        <tr
-                          key={dia}
-                          className={
-                            ehHoje
-                              ? "border-b border-line bg-brand-tint/60"
-                              : "border-b border-line"
-                          }
-                        >
-                          <th
-                            scope="row"
-                            className="py-2.5 pr-4 text-left font-medium text-ink"
-                          >
-                            <span className="sm:hidden">
-                              {DIAS_CURTOS[indice]}
-                            </span>
-                            <span className="hidden sm:inline">{dia}</span>
-                            {ehHoje ? (
-                              <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-on-brand">
-                                hoje
-                              </span>
-                            ) : null}
-                          </th>
-                          <td className="py-2.5 text-right text-ink-soft tabular">
-                            {faixas.length === 0 ? (
-                              <span className="text-ink-mute">Fechado</span>
-                            ) : (
-                              faixas
-                                .map(
-                                  (faixa) =>
-                                    `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
-                                )
-                                .join(" e ")
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </section>
-
-            {/* Localização + mapa */}
-            {negocio.localizacao?.endereco ? (
-              <section className="mt-10" aria-labelledby="localizacao">
-                <h2
-                  id="localizacao"
-                  className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
-                >
-                  Onde fica
-                </h2>
-                <MapaEndereco
-                  nome={negocio.nome}
-                  endereco={negocio.localizacao.endereco}
-                  bairro={negocio.localizacao.bairro}
-                  latitude={negocio.localizacao.latitude}
-                  longitude={negocio.localizacao.longitude}
-                  semPontoComercial={Boolean(
-                    negocio.localizacao.semPontoComercial,
-                  )}
-                />
-              </section>
-            ) : null}
           </div>
 
-          {/* Coluna lateral */}
-          <aside className="space-y-4 lg:sticky lg:top-24">
-            <div className="rounded-[22px] border border-line bg-surface p-5">
-              <h2 className="font-[family-name:var(--font-fraunces)] text-lg font-semibold">
-                Informações
-              </h2>
-              <dl className="mt-3 space-y-3 text-sm">
-                {categorias.length > 0 ? (
-                  <div>
-                    <dt className="text-ink-mute">Categoria</dt>
-                    <dd className="text-ink">
-                      {categorias.map((categoria) => categoria.nome).join(", ")}
-                    </dd>
-                  </div>
-                ) : null}
-                {negocio.localizacao?.bairro ? (
-                  <div>
-                    <dt className="text-ink-mute">Bairro</dt>
-                    <dd className="text-ink">{negocio.localizacao.bairro}</dd>
-                  </div>
-                ) : null}
-                {negocio.localizacao?.areaAtendimento ? (
-                  <div>
-                    <dt className="text-ink-mute">Área de atendimento</dt>
-                    <dd className="text-ink">
-                      {negocio.localizacao.areaAtendimento}
-                    </dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt className="text-ink-mute">Horário de hoje</dt>
-                  <dd className="text-ink">
-                    {sobAgendamento
-                      ? "Somente sob agendamento"
-                      : semHorario
-                        ? "Horário não informado"
-                        : faixasHoje.length === 0
-                          ? "Fechado hoje"
-                          : faixasHoje
-                              .map(
-                                (faixa) =>
-                                  `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
-                              )
-                              .join(" e ")}
-                  </dd>
-                </div>
-                {negocio.localizacao?.endereco ? (
-                  <div>
-                    <dt className="text-ink-mute">Endereço</dt>
-                    <dd className="text-ink">
-                      {comporEndereco({
-                        endereco: negocio.localizacao.endereco,
-                        numero: negocio.localizacao.numero,
-                        bairro: negocio.localizacao.bairro,
-                        cidade: null,
-                      })}
-                    </dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt className="text-ink-mute">Situação</dt>
-                  <dd className="text-ink">
-                    {sobAgendamento
-                      ? "Somente sob agendamento"
-                      : abertoAgora === null
-                        ? "Horário não informado"
-                        : abertoAgora
-                          ? "Aberto agora"
-                          : "Fechado agora"}
-                  </dd>
-                </div>
-              </dl>
+          {/*
+            Lateral fixa: tudo o que decide o contato fica aqui, sem rolar.
+            Cada linha tem ícone porque a leitura é em varredura, não em frase.
+          */}
+          <aside className="lg:sticky lg:top-24">
+            <div className="overflow-hidden rounded-[22px] border border-line bg-surface">
+              <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-5 py-3">
+                <Info className="size-4 text-brand" aria-hidden="true" />
+                <h2 className="font-[family-name:var(--font-fraunces)] text-lg font-semibold">
+                  Informações
+                </h2>
+              </div>
 
-              <div className="mt-5 border-t border-line pt-4">
+              <div className="space-y-5 p-5">
+                {negocio.localizacao?.endereco ||
+                negocio.localizacao?.areaAtendimento ? (
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-brand">
+                      <MapPin className="size-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 text-sm">
+                      <p className="font-semibold text-ink">Onde atende</p>
+                      {negocio.localizacao?.endereco ? (
+                        <p className="text-ink-soft">
+                          {comporEndereco({
+                            endereco: negocio.localizacao.endereco,
+                            numero: negocio.localizacao.numero,
+                            bairro: negocio.localizacao.bairro,
+                            cidade: null,
+                          })}
+                        </p>
+                      ) : null}
+                      {negocio.localizacao?.areaAtendimento ? (
+                        <p className="text-ink-soft">
+                          {negocio.localizacao.areaAtendimento}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div>
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-brand">
+                      <Clock className="size-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 text-sm">
+                      <h3 id="horarios" className="font-semibold text-ink">
+                        Horários
+                      </h3>
+                      <p className="text-ink-soft">
+                        <span className="text-ink-mute">Horário de hoje: </span>
+                        {horarioDeHoje ?? "Horário não informado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {negocio.horarios.length > 0 && !sobAgendamento ? (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+                        Ver a semana
+                      </summary>
+                      <ul className="mt-1 divide-y divide-line/70 text-[13px]">
+                        {DIAS.map((dia, indice) => {
+                          const faixas = porDia.get(indice) ?? [];
+                          const ehHoje = indice === diaAtual;
+                          return (
+                            <li
+                              key={dia}
+                              className={
+                                ehHoje
+                                  ? "-mx-2 rounded-lg bg-brand-tint/60 px-2"
+                                  : undefined
+                              }
+                            >
+                              <div className="flex items-baseline justify-between gap-3 py-1.5">
+                                <span
+                                  className={
+                                    ehHoje
+                                      ? "font-semibold text-ink"
+                                      : "text-ink-soft"
+                                  }
+                                >
+                                  {DIAS_CURTOS[indice]}
+                                  {ehHoje ? (
+                                    <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-strong">
+                                      hoje
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="tabular text-ink-soft">
+                                  {faixas.length === 0
+                                    ? "Fechado"
+                                    : faixas
+                                        .map(
+                                          (faixa) =>
+                                            `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
+                                        )
+                                        .join(", ")}
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
+                  ) : null}
+                </div>
+
+                {telefones.length +
+                  emails.length +
+                  instagrams.length +
+                  sites.length >
+                  0 || whatsapps.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-brand">
+                        <Phone className="size-4" aria-hidden="true" />
+                      </span>
+                      <h3
+                        id="contatos"
+                        className="text-sm font-semibold text-ink"
+                      >
+                        Contatos
+                      </h3>
+                    </div>
+
+                    <ul className="mt-2 space-y-1.5">
+                      {whatsapps.map((contato) => (
+                        <li key={contato.id}>
+                          <a
+                            href={linkWhatsApp(contato.valor, negocio.nome)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-[10px] border border-positive/25 bg-positive-tint px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-positive/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                          >
+                            <GlifoWhatsApp className="size-4 text-positive" />
+                            {formatarTelefone(contato.valor)}
+                          </a>
+                        </li>
+                      ))}
+
+                      {instagrams.map((contato) => (
+                        <li key={contato.id}>
+                          <a
+                            href={`https://instagram.com/${contato.valor.replace(/^@/, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                          >
+                            <GlifoInstagram className="size-4 text-ink-mute" />@
+                            {contato.valor.replace(/^@/, "")}
+                          </a>
+                        </li>
+                      ))}
+
+                      {telefones.map((contato) => (
+                        <li key={contato.id}>
+                          <a
+                            href={`tel:${contato.valor.replace(/\D/g, "")}`}
+                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                          >
+                            <Phone
+                              className="size-4 text-ink-mute"
+                              aria-hidden="true"
+                            />
+                            {formatarTelefone(contato.valor)}
+                          </a>
+                        </li>
+                      ))}
+
+                      {emails.map((contato) => (
+                        <li key={contato.id}>
+                          <a
+                            href={`mailto:${contato.valor}`}
+                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                          >
+                            <Mail
+                              className="size-4 text-ink-mute"
+                              aria-hidden="true"
+                            />
+                            {contato.valor}
+                          </a>
+                        </li>
+                      ))}
+
+                      {sites.map((contato) => (
+                        <li key={contato.id}>
+                          <a
+                            href={
+                              contato.valor.startsWith("http")
+                                ? contato.valor
+                                : `https://${contato.valor}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                          >
+                            <ExternalLink
+                              className="size-4 text-ink-mute"
+                              aria-hidden="true"
+                            />
+                            {contato.valor.replace(/^https?:\/\//, "")}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <p className="mt-2 px-3 text-xs text-ink-mute">
+                      O WhatsApp é o contato do comércio. A equipe do guia não
+                      responde por lá.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-t border-line p-5">
                 <Button asChild variant="outline" className="w-full">
                   <Link href={`/negocio/${slug}/correcao`}>
                     <Pencil className="size-4" aria-hidden="true" />
@@ -732,6 +712,26 @@ export default async function NegocioPage({
             </div>
           </aside>
         </div>
+
+        {/* Mapa: só quando existe endereço para localizar */}
+        {negocio.localizacao?.endereco ? (
+          <section className="mt-10" aria-labelledby="localizacao">
+            <h2
+              id="localizacao"
+              className="font-[family-name:var(--font-fraunces)] text-xl font-semibold"
+            >
+              Onde fica
+            </h2>
+            <MapaEndereco
+              nome={negocio.nome}
+              endereco={negocio.localizacao.endereco}
+              bairro={negocio.localizacao.bairro}
+              latitude={negocio.localizacao.latitude}
+              longitude={negocio.localizacao.longitude}
+              semPontoComercial={Boolean(negocio.localizacao.semPontoComercial)}
+            />
+          </section>
+        ) : null}
       </div>
     </div>
   );
