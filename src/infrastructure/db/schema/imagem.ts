@@ -14,9 +14,16 @@ import { anexo } from "./anexo";
 
 export const imagem = pgTable("imagem", {
   id: uuid("id").primaryKey().defaultRandom(),
-  negocioId: uuid("negocio_id")
-    .notNull()
-    .references(() => negocio.id),
+  /*
+   * O vínculo é com o comércio OU com a solicitação — nunca os dois vazios.
+   *
+   * Antes a coluna era NOT NULL: uma foto enviada junto com o pedido de
+   * inclusão não tinha como ser gravada, porque o comércio só nasce na
+   * aprovação. Resultado: o upload do wizard era descartado e a fila de
+   * moderação ficava sempre vazia. Agora a foto nasce presa à solicitação e
+   * ganha o comércio quando a equipe aprova.
+   */
+  negocioId: uuid("negocio_id").references(() => negocio.id),
   solicitacaoId: uuid("solicitacao_id").references(() => solicitacao.id),
   anexoOrigemId: uuid("anexo_origem_id").references(() => anexo.id),
   tipo: varchar("tipo", { length: 20 }).notNull(), // 'logo' | 'foto'

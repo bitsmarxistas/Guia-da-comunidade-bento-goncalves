@@ -1,28 +1,12 @@
 import Image from "next/image";
+import { podeExibirImagem } from "@/domain/midia/url-publica";
 
 /**
- * Hospedeiros de imagem que o guia realmente serve.
- *
- * A moderação aprova a imagem pelo `url` gravado na tabela `imagem`. Se esse
- * endereço apontar para um host que não é nosso (dado antigo, seed, link
- * quebrado), a imagem simplesmente não é exibida e o fallback desenhado entra
- * no lugar — melhor que um quadrado quebrado ou um 500 do otimizador.
+ * A regra de host vive em `domain/midia/url-publica` (testável). Aqui fica só
+ * a renderização: foto aprovada quando o host é nosso, monograma desenhado
+ * quando não é.
  */
-const HOSTS_PERMITIDOS = ["assets.seudominio.com.br", "guiabg.com.br"];
-
-export function podeExibirImagem(url: string | null | undefined): boolean {
-  if (!url) return false;
-  try {
-    const alvo = new URL(url);
-    if (alvo.protocol !== "https:") return false;
-    return (
-      HOSTS_PERMITIDOS.includes(alvo.hostname) ||
-      alvo.hostname.endsWith(".r2.cloudflarestorage.com")
-    );
-  } catch {
-    return false;
-  }
-}
+export { podeExibirImagem };
 
 export function primeiraImagem(
   imagens: Array<{ url: string; tipo: string }> | undefined,

@@ -12,6 +12,7 @@ import {
   negocio,
   contato,
   categoria,
+  imagem,
 } from "@/infrastructure/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
@@ -28,6 +29,9 @@ import {
   logSolicitacaoRecebida,
   logVinculacaoSolicitacao,
 } from "@/infrastructure/db/schema/logs";
+import { MAX_FOTOS_POR_SOLICITACAO } from "@/domain/midia/arquivo";
+import { normalizarMidiasEnviadas } from "@/application/midia/upload-publico";
+import { objetoExiste } from "@/infrastructure/r2/client";
 
 /** Nomes das categorias escolhidas — o diff fala em nome, não em UUID. */
 async function nomesDasCategorias(ids: string[]): Promise<string[]> {
@@ -158,6 +162,36 @@ export async function criarSolicitacaoAtualizacaoAction(
   const data = parseResult.data;
 
   /*
+   * Fotos do chamado: a pessoa pode trocar as da ficha. O arquivo já subiu
+   * direto para o bucket; aqui só conferimos chave/URL e existência real do
+   * objeto antes de gravar. As fotos entram pendentes e, na aprovação do
+   * chamado, passam a pertencer ao comércio.
+   */
+  const fotosRecebidas = normalizarMidiasEnviadas(formData.get("imagens"), {
+    finalidade: "imagem",
+    maximo: MAX_FOTOS_POR_SOLICITACAO,
+  });
+  if (!fotosRecebidas.ok) {
+    return { error: fotosRecebidas.erro };
+  }
+
+  const fotosVerificadas = await Promise.all(
+    fotosRecebidas.midias.map(async (foto) => ({
+      foto,
+      existe: await objetoExiste(foto.key),
+    })),
+  );
+
+  if (fotosVerificadas.some((item) => !item.existe)) {
+    return {
+      error:
+        "Uma das fotos não chegou ao servidor. Remova-a e envie novamente antes de concluir.",
+    };
+  }
+
+  const fotosNovas = fotosVerificadas.map((item) => item.foto);
+
+  /*
    * O chamado de correção nasce da diferença entre a ficha publicada e o que
    * a pessoa enviou. A lista de alterações é gravada dentro do chamado: é ela
    * que a equipe aprova no painel — nada é aplicado direto no comércio.
@@ -173,6 +207,7 @@ export async function criarSolicitacaoAtualizacaoAction(
         contatos: true,
         localizacao: true,
         categorias: { with: { categoria: true } },
+        imagens: true,
       },
     });
 
@@ -211,6 +246,26 @@ export async function criarSolicitacaoAtualizacaoAction(
           : categoriasAtuais,
       },
     );
+
+    /*
+     * Trocar as fotos também é uma correção: o chamado só com imagem nova tem
+     * que abrir, mesmo que nenhum campo de texto tenha mudado.
+     */
+    if (fotosNovas.length > 0) {
+      const publicadas = alvo.imagens.filter(
+        (foto) => foto.situacao === "aprovada",
+      ).length;
+
+      alteracoes = [
+        ...alteracoes,
+        {
+          campo: "fotos",
+          rotulo: "Fotos",
+          de: publicadas > 0 ? `${publicadas} publicada(s)` : "sem foto",
+          para: `${fotosNovas.length} nova(s) para aprovação`,
+        },
+      ];
+    }
 
     if (alteracoes.length === 0) {
       return {
@@ -317,6 +372,17 @@ export async function criarSolicitacaoAtualizacaoAction(
       .returning();
     const novaSolicitacao = novaSolicitacaoResult[0];
     if (!novaSolicitacao) throw new Error("Falha ao criar solicitação");
+
+    // Fotos do chamado: presas à solicitação, pendentes de moderação.
+    for (const foto of fotosNovas) {
+      await tx.insert(imagem).values({
+        solicitacaoId: novaSolicitacao.id,
+        negocioId: null,
+        tipo: foto.tipo === "logo" ? "logo" : "foto",
+        situacao: "pendente",
+        url: foto.url,
+      });
+    }
 
     // Sugestão de categoria se fornecida
     if (data.sugestaoCategoria?.trim()) {

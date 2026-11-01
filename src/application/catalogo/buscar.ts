@@ -325,6 +325,8 @@ export async function buscarNegocios(
     Array<{ id: string; url: string; tipo: string }>
   >();
   for (const img of imagensArr) {
+    // Imagem de solicitação ainda sem comércio não entra em card nenhum.
+    if (!img.negocioId) continue;
     if (!imagensByNegocio.has(img.negocioId))
       imagensByNegocio.set(img.negocioId, []);
     imagensByNegocio

@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/infrastructure/db/client";
 import { categoria } from "@/infrastructure/db/schema/categoria";
+import { imagem } from "@/infrastructure/db/schema";
 import { buscarNegocioPorSlugId } from "./_components/consultar";
 import { NegocioForm } from "../_components/negocio-form";
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import { BotaoPublicacao } from "./_components/botao-publicacao";
+import { FotosDoNegocio } from "./_components/fotos-do-negocio";
 
 export default async function EditarNegocioPage({
   params,
@@ -23,6 +25,17 @@ export default async function EditarNegocioPage({
     .where(eq(categoria.ativa, true))
     .orderBy(asc(categoria.nome));
 
+  const fotos = await db
+    .select({
+      id: imagem.id,
+      url: imagem.url,
+      tipo: imagem.tipo,
+      situacao: imagem.situacao,
+    })
+    .from(imagem)
+    .where(eq(imagem.negocioId, negocio.id))
+    .orderBy(asc(imagem.criadoEm));
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -34,6 +47,10 @@ export default async function EditarNegocioPage({
           publicado={negocio.situacaoPublicacao === "publicado"}
         />
       </AdminPageHeader>
+
+      <div className="max-w-3xl">
+        <FotosDoNegocio negocioId={negocio.id} fotos={fotos} />
+      </div>
 
       <div className="max-w-3xl rounded-[14px] border border-line bg-surface p-5">
         <NegocioForm

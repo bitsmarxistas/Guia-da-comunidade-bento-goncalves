@@ -15,5 +15,8 @@ process.env.R2_ACCOUNT_ID ??= "teste";
 process.env.R2_ACCESS_KEY_ID ??= "teste";
 process.env.R2_SECRET_ACCESS_KEY ??= "teste";
 process.env.R2_BUCKET_NAME ??= "teste";
+// Domínio público do bucket: a validação das URLs enviadas pelo formulário
+// compara com ele (domain/midia/arquivo → normalizarMidiasEnviadas).
+process.env.R2_PUBLIC_URL ??= "https://pub-exemplo.r2.dev";
 process.env.UPASTASH_REDIS_URL ??= "";
 process.env.UPSTASH_REDIS_TOKEN ??= "";

@@ -72,6 +72,8 @@ export default async function CorrecaoPage({
               categoriasIds: negocio.categorias
                 .map((vinculo) => vinculo.categoriaId)
                 .filter(Boolean),
+              // Só as aprovadas chegam aqui (buscarNegocioPorSlug filtra).
+              fotos: negocio.imagens.map((foto) => foto.url),
             }}
           />
         </div>

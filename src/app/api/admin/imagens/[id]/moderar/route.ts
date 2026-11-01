@@ -231,10 +231,15 @@ export async function POST(
       }
 
       if (acao === "promover") {
+        /*
+         * A imagem promovida nasce presa à solicitação do anexo (não ao
+         * comércio): antes o código gravava `negocioId = solicitacaoId`, o que
+         * violava a chave estrangeira e derrubava a promoção com erro 500.
+         */
         const [novaImagem] = await db
           .insert(imagem)
           .values({
-            negocioId: ax.solicitacaoId,
+            negocioId: null,
             solicitacaoId: ax.solicitacaoId,
             anexoOrigemId: ax.id,
             tipo: "foto",

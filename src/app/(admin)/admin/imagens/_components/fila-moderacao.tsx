@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/components/alert";
 import { Badge } from "@/ui/components/badge";
@@ -16,6 +17,10 @@ export interface ImagemFilaItem {
   url: string;
   tipo: string;
   negocioNome: string | null;
+  negocioSlug?: string | null;
+  /** Protocolo da solicitação dona da foto, quando ainda não há comércio. */
+  protocolo?: string | null;
+  solicitacaoId?: string | null;
   criadoEm: Date;
 }
 
@@ -93,13 +98,13 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
 
     toast.success(
       acao === "aprovar"
-        ? "Imagem aprovada com sucesso."
-        : "Imagem rejeitada com sucesso.",
+        ? "Imagem aprovada. Ela aparece na ficha do comércio."
+        : "Imagem rejeitada.",
     );
     router.refresh();
   }
 
-  const nome = imagem.negocioNome ?? "Solicitação";
+  const nome = imagem.negocioNome ?? "Solicitação sem comércio publicado";
   const tipoLabel = imagem.tipo === "logo" ? "Logo" : "Foto";
   const dataFormatada = new Date(imagem.criadoEm).toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -111,19 +116,40 @@ function ModeracaoItem({ imagem }: ModeracaoItemProps) {
     <Card>
       <CardContent className="space-y-4 p-4">
         <div className="flex items-center gap-4">
+          {/* Miniatura de moderação: <img> direto, sem otimizador, para ver o
+              arquivo exatamente como foi enviado. */}
           <img
             src={imagem.url}
             alt={nome}
             width={96}
             height={96}
-            className="h-24 w-24 rounded-lg border border-line object-cover"
+            className="size-24 shrink-0 rounded-lg border border-line bg-brand-tint object-cover"
           />
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="truncate font-medium text-ink">{nome}</p>
               <Badge variant="secondary">{tipoLabel}</Badge>
             </div>
+            {imagem.protocolo ? (
+              <p className="text-sm text-ink-soft">
+                Protocolo{" "}
+                <span className="font-mono text-xs">{imagem.protocolo}</span>
+              </p>
+            ) : null}
             <p className="text-sm text-ink-soft">{dataFormatada}</p>
+            {!imagem.negocioSlug ? (
+              <p className="text-xs text-ink-mute">
+                O cadastro ainda não foi aprovado: a foto fica guardada e
+                aparece na ficha assim que o comércio for publicado.
+              </p>
+            ) : (
+              <Link
+                href={`/admin/negocios/${imagem.negocioSlug}`}
+                className="inline-flex min-h-8 items-center text-xs font-semibold text-brand hover:underline"
+              >
+                Abrir ficha no painel
+              </Link>
+            )}
           </div>
         </div>
 
@@ -230,7 +256,7 @@ export function ImagemFilaModeracao({ imagens }: ImagemFilaModeracaoProps) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {imagens.map((imagemItem) => (
         <ModeracaoItem key={imagemItem.id} imagem={imagemItem} />
       ))}

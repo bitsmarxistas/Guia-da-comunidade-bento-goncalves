@@ -1,197 +1,121 @@
 // src/application/midia/upload-publico.ts
-"use server";
-
-import { z } from "zod";
+import { env } from "@/shared/env";
 import {
-  getPresignedUploadUrl,
-  validateImageFile,
-  validateDocFile,
-} from "@/infrastructure/r2/client";
-import { revalidatePath } from "next/cache";
+  gerarChaveArmazenamento,
+  MAX_ANEXOS_POR_SOLICITACAO,
+  MAX_FOTOS_POR_SOLICITACAO,
+  normalizarMidiasEnviadas as normalizarMidias,
+  PREFIXO_SOLICITACAO_TEMP,
+  validarUpload,
+  type FinalidadeMidia,
+  type ResultadoMidias,
+} from "@/domain/midia/arquivo";
+import { assinarUpload, urlPublicaDaChave } from "@/infrastructure/r2/client";
 
-const uploadImagemSchema = z.object({
-  solicitacaoId: z.string().uuid().optional(),
-  tipo: z.enum(["logo", "foto"]),
-  fileName: z.string().min(1),
-  fileType: z.string().min(1),
-  fileSize: z.number().positive(),
-});
+/*
+ * Upload do site: o navegador pede uma URL assinada, grava o arquivo direto no
+ * R2 e depois manda só a chave junto com a solicitação.
+ *
+ * O arquivo nunca passa pelo servidor da Vercel (limite de 4,5 MB por request) e
+ * o servidor não precisa confiar no tamanho informado: a assinatura carrega o
+ * tamanho exato e o R2 recusa qualquer outro.
+ */
 
-export async function getPresignedImageUploadUrl(
-  prevState: unknown,
-  formData: FormData,
-) {
-  const rawData = {
-    solicitacaoId: formData.get("solicitacaoId") || undefined,
-    tipo: formData.get("tipo"),
-    fileName: formData.get("fileName"),
-    fileType: formData.get("fileType"),
-    fileSize: Number(formData.get("fileSize")),
-  };
-
-  const parseResult = uploadImagemSchema.safeParse(rawData);
-  if (!parseResult.success) {
-    const errorMsg = Object.values(parseResult.error.flatten().fieldErrors)
-      .flat()
-      .join(", ");
-    return { error: errorMsg || "Dados inválidos" };
-  }
-
-  const { solicitacaoId, tipo, fileName, fileType, fileSize } =
-    parseResult.data;
-
-  // Validar arquivo
-  const mockFile = new File([], fileName, { type: fileType });
-  Object.defineProperty(mockFile, "size", { value: fileSize });
-  const validation = validateImageFile(mockFile);
-  if (!validation.valid) {
-    return { error: validation.error };
-  }
-
-  const prefix = solicitacaoId ? `solicitacoes/${solicitacaoId}` : "temp";
-  const result = await getPresignedUploadUrl(
-    prefix,
-    fileName,
-    fileType,
-    fileSize,
-  );
-
-  if (!result.success) {
-    return { error: result.error };
-  }
-
-  // Retornar URL de upload e chave para o cliente fazer upload direto
-  return {
-    success: true,
-    uploadUrl: result.uploadUrl,
-    key: result.key,
-    publicUrl: result.publicUrl,
-  };
+export interface PedidoUploadMidia {
+  finalidade: FinalidadeMidia;
+  mimeType: unknown;
+  tamanhoBytes: unknown;
+  /** Presente quando o admin anexa uma foto a um comércio que já existe. */
+  negocioId?: string | null;
 }
 
-const uploadAnexoSchema = z.object({
-  solicitacaoId: z.string().uuid().optional(),
-  fileName: z.string().min(1),
-  fileType: z.string().min(1),
-  fileSize: z.number().positive(),
-});
+export type ResultadoUploadMidia =
+  | {
+      ok: true;
+      uploadUrl: string;
+      key: string;
+      url: string;
+      expiresIn: number;
+    }
+  | { ok: false; erro: string };
 
-export async function getPresignedAnexoUploadUrl(
-  prevState: unknown,
-  formData: FormData,
-) {
-  const rawData = {
-    solicitacaoId: formData.get("solicitacaoId") || undefined,
-    fileName: formData.get("fileName"),
-    fileType: formData.get("fileType"),
-    fileSize: Number(formData.get("fileSize")),
-  };
+export async function criarUploadAssinado(
+  pedido: PedidoUploadMidia,
+): Promise<ResultadoUploadMidia> {
+  const validacao = validarUpload(pedido.finalidade, {
+    mimeType: pedido.mimeType,
+    tamanhoBytes: pedido.tamanhoBytes,
+  });
 
-  const parseResult = uploadAnexoSchema.safeParse(rawData);
-  if (!parseResult.success) {
-    const errorMsg = Object.values(parseResult.error.flatten().fieldErrors)
-      .flat()
-      .join(", ");
-    return { error: errorMsg || "Dados inválidos" };
+  if (!validacao.valido) {
+    return { ok: false, erro: validacao.erro };
   }
 
-  const { solicitacaoId, fileName, fileType, fileSize } = parseResult.data;
+  const prefixo =
+    pedido.finalidade === "anexo"
+      ? `${PREFIXO_SOLICITACAO_TEMP}/anexos`
+      : pedido.negocioId
+        ? `negocios/${pedido.negocioId}`
+        : PREFIXO_SOLICITACAO_TEMP;
 
-  // Validar arquivo
-  const mockFile = new File([], fileName, { type: fileType });
-  Object.defineProperty(mockFile, "size", { value: fileSize });
-  const validation = validateDocFile(mockFile);
-  if (!validation.valid) {
-    return { error: validation.error };
+  const mimeType = String(pedido.mimeType);
+  const tamanhoBytes = Number(pedido.tamanhoBytes);
+  const chave = gerarChaveArmazenamento(prefixo, validacao.extensao);
+
+  // Sem `R2_PUBLIC_URL` a URL pública sai vazia e a foto nunca apareceria no
+  // site: melhor recusar o envio do que gravar um registro quebrado.
+  if (!urlPublicaDaChave(chave)) {
+    console.error("[Upload] R2_PUBLIC_URL não configurada.");
+    return {
+      ok: false,
+      erro: "O envio de imagens está indisponível no momento. Tente mais tarde.",
+    };
   }
 
-  const prefix = solicitacaoId
-    ? `solicitacoes/${solicitacaoId}/anexos`
-    : "temp/anexos";
-  const result = await getPresignedUploadUrl(
-    prefix,
-    fileName,
-    fileType,
-    fileSize,
-  );
-
-  if (!result.success) {
-    return { error: result.error };
+  try {
+    const assinatura = await assinarUpload(chave, mimeType, tamanhoBytes);
+    return {
+      ok: true,
+      uploadUrl: assinatura.uploadUrl,
+      key: assinatura.key,
+      url: assinatura.publicUrl || urlPublicaDaChave(chave),
+      expiresIn: assinatura.expiresIn,
+    };
+  } catch (erro) {
+    console.error("[Upload] Falha ao assinar URL:", erro);
+    return {
+      ok: false,
+      erro: "Não foi possível preparar o envio da imagem. Tente de novo.",
+    };
   }
-
-  return {
-    success: true,
-    uploadUrl: result.uploadUrl,
-    key: result.key,
-    publicUrl: result.publicUrl,
-  };
 }
 
-// Após upload direto do cliente, registrar a imagem no banco associada à solicitação
-const registrarImagemSchema = z.object({
-  solicitacaoId: z.string().uuid(),
-  tipo: z.enum(["logo", "foto"]),
-  url: z.string().url(),
-  key: z.string().min(1),
-});
+/**
+ * Versão de produção de `normalizarMidiasEnviadas`: usa a URL pública do bucket
+ * configurada no ambiente. A regra em si (prefixo, extensão, quantidade) é do
+ * domínio e não depende de env.
+ */
+export function normalizarMidiasEnviadas(
+  bruto: unknown,
+  opcoes: { finalidade: FinalidadeMidia; maximo: number },
+): ResultadoMidias {
+  const basePublica = env.R2_PUBLIC_URL ?? "";
+  const temItens =
+    bruto !== undefined &&
+    bruto !== null &&
+    bruto !== "" &&
+    bruto !== "[]" &&
+    !(Array.isArray(bruto) && bruto.length === 0);
 
-export async function registrarImagemSolicitacao(
-  prevState: unknown,
-  formData: FormData,
-) {
-  const rawData = {
-    solicitacaoId: formData.get("solicitacaoId"),
-    tipo: formData.get("tipo"),
-    url: formData.get("url"),
-    key: formData.get("key"),
-  };
-
-  const parseResult = registrarImagemSchema.safeParse(rawData);
-  if (!parseResult.success) {
-    const errorMsg = Object.values(parseResult.error.flatten().fieldErrors)
-      .flat()
-      .join(", ");
-    return { error: errorMsg || "Dados inválidos" };
+  if (!basePublica && temItens) {
+    return {
+      ok: false,
+      erro: "O envio de arquivos está indisponível no momento. Tente mais tarde.",
+    };
   }
 
-  // Aqui apenas retorna sucesso - a associação real acontece quando a solicitação é aprovada
-  // e o negócio é criado. As imagens ficam vinculadas à solicitação.
-  revalidatePath(`/solicitar`);
-
-  return { success: true };
+  return normalizarMidias(bruto, { ...opcoes, basePublica });
 }
 
-const registrarAnexoSchema = z.object({
-  solicitacaoId: z.string().uuid(),
-  url: z.string().url(),
-  key: z.string().min(1),
-  nomeOriginal: z.string().min(1),
-  tipoMime: z.string().min(1),
-  tamanhoBytes: z.number().positive(),
-});
-
-export async function registrarAnexoSolicitacao(
-  prevState: unknown,
-  formData: FormData,
-) {
-  const rawData = {
-    solicitacaoId: formData.get("solicitacaoId"),
-    url: formData.get("url"),
-    key: formData.get("key"),
-    nomeOriginal: formData.get("nomeOriginal"),
-    tipoMime: formData.get("tipoMime"),
-    tamanhoBytes: Number(formData.get("tamanhoBytes")),
-  };
-
-  const parseResult = registrarAnexoSchema.safeParse(rawData);
-  if (!parseResult.success) {
-    const errorMsg = Object.values(parseResult.error.flatten().fieldErrors)
-      .flat()
-      .join(", ");
-    return { error: errorMsg || "Dados inválidos" };
-  }
-
-  revalidatePath(`/solicitar`);
-
-  return { success: true };
-}
+export const LIMITE_FOTOS = MAX_FOTOS_POR_SOLICITACAO;
+export const LIMITE_ANEXOS = MAX_ANEXOS_POR_SOLICITACAO;

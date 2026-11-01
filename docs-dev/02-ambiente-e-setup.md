@@ -41,6 +41,25 @@ sobe** (é proposital — falha cedo em vez de erro estranho em runtime).
 > ⚠️ **Cuidado com o alvo do banco.** Neste repositório o `.env.local` de
 > desenvolvimento aponta para o Neon de **produção**. Ao rodar scripts,
 > confirme o host antes: `(Get-Content .env.local | Select-String DATABASE_URL)`.
+
+### CORS do bucket de imagens (obrigatório)
+
+O upload do formulário público vai do **navegador** direto para o R2 (PUT
+assinado). O bucket precisa de CORS liberando `PUT` dos domínios do site, senão
+o envio falha no browser com erro de CORS mesmo com a URL assinada correta:
+
+```bash
+# uma vez por bucket (S3 API do R2, com as mesmas credenciais)
+# AllowedOrigins: https://guiabg.com.br, https://www.guiabg.com.br, http://localhost:3000, http://localhost:3100
+# AllowedMethods: PUT, GET, HEAD   AllowedHeaders: *   ExposeHeaders: ETag
+```
+
+O bucket também precisa do domínio público habilitado (`R2_PUBLIC_URL`, formato
+`https://pub-….r2.dev`) — é o host que `podeExibirImagem` valida antes de
+renderizar a foto aprovada. A CSP do `next.config.ts` já libera
+`https://*.r2.dev` em `img-src` e `https://*.r2.cloudflarestorage.com` em
+`connect-src`.
+
 > Para experimentar, sobrescreva com o Postgres local:
 > `$env:DATABASE_URL='postgresql://dev:dev@localhost:5432/diretorio_dev'`
 

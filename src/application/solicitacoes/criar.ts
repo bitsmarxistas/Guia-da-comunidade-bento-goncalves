@@ -11,6 +11,8 @@ import {
   documentoTermo,
   negocio,
   contato,
+  imagem,
+  anexo,
 } from "@/infrastructure/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { normalizarTexto } from "@/domain/utils/normalizar-texto";
@@ -18,6 +20,12 @@ import { logSolicitacaoRecebida } from "@/infrastructure/db/schema/logs";
 import { protocoloDaSolicitacao } from "@/domain/solicitacoes/protocolo";
 import { notificarSolicitacaoRecebida } from "@/infrastructure/email/participacao";
 import { colunaNormalizada } from "@/infrastructure/db/sql/normalizado";
+import {
+  MAX_ANEXOS_POR_SOLICITACAO,
+  MAX_FOTOS_POR_SOLICITACAO,
+} from "@/domain/midia/arquivo";
+import { normalizarMidiasEnviadas } from "@/application/midia/upload-publico";
+import { objetoExiste } from "@/infrastructure/r2/client";
 
 /*
  * Mensagens em português, uma por campo.
@@ -127,6 +135,61 @@ export async function criarSolicitacaoAction(
 
   const data = parseResult.data;
 
+  /*
+   * Fotos e anexos: o navegador já gravou os arquivos no bucket e manda só a
+   * chave. Aqui a URL é conferida contra o nosso domínio público, o número de
+   * arquivos é limitado e cada objeto é confirmado no bucket antes de virar
+   * linha — sem isso, um formulário adulterado publicaria imagem de terceiros
+   * na ficha do comércio.
+   */
+  const fotosRecebidas = normalizarMidiasEnviadas(formData.get("imagens"), {
+    finalidade: "imagem",
+    maximo: MAX_FOTOS_POR_SOLICITACAO,
+  });
+  if (!fotosRecebidas.ok) {
+    return { error: fotosRecebidas.erro };
+  }
+
+  const anexosRecebidos = normalizarMidiasEnviadas(formData.get("anexos"), {
+    finalidade: "anexo",
+    maximo: MAX_ANEXOS_POR_SOLICITACAO,
+  });
+  if (!anexosRecebidos.ok) {
+    return { error: anexosRecebidos.erro };
+  }
+
+  const [fotosExistentes, anexosExistentes] = await Promise.all([
+    Promise.all(
+      fotosRecebidas.midias.map(async (foto) => ({
+        foto,
+        existe: await objetoExiste(foto.key),
+      })),
+    ),
+    Promise.all(
+      anexosRecebidos.midias.map(async (anexoSolicitado) => ({
+        anexoSolicitado,
+        existe: await objetoExiste(anexoSolicitado.key),
+      })),
+    ),
+  ]);
+
+  if (fotosExistentes.some((item) => !item.existe)) {
+    return {
+      error:
+        "Uma das fotos não chegou ao servidor. Remova-a e envie novamente antes de concluir.",
+    };
+  }
+
+  if (anexosExistentes.some((item) => !item.existe)) {
+    return {
+      error:
+        "Um dos anexos não chegou ao servidor. Remova-o e envie novamente antes de concluir.",
+    };
+  }
+
+  const fotos = fotosExistentes.map((item) => item.foto);
+  const anexosValidos = anexosExistentes.map((item) => item.anexoSolicitado);
+
   // Verificar duplicata (nível C - apenas alerta)
   const nomeNormalizado = data.nomeNegocio
     .trim()
@@ -207,6 +270,33 @@ export async function criarSolicitacaoAction(
         solicitacaoId: novaSolicitacao.id,
         textoSugerido: data.sugestaoCategoria.trim(),
         situacao: "pendente",
+      });
+    }
+
+    // Fotos: entram pendentes de moderação, presas à solicitação. Só ganham
+    // `negocioId` quando a equipe aprova o cadastro.
+    for (const foto of fotos) {
+      await tx.insert(imagem).values({
+        solicitacaoId: novaSolicitacao.id,
+        negocioId: null,
+        tipo: foto.tipo === "logo" ? "logo" : "foto",
+        situacao: "pendente",
+        url: foto.url,
+      });
+    }
+
+    // Anexos: documentos de apoio que a equipe consulta ao analisar.
+    for (const arquivo of anexosValidos) {
+      await tx.insert(anexo).values({
+        solicitacaoId: novaSolicitacao.id,
+        arquivoUrl: arquivo.url,
+        nomeOriginal: (arquivo.nomeOriginal ?? "arquivo").slice(0, 255),
+        mimeType: (arquivo.mimeType ?? "application/octet-stream").slice(
+          0,
+          100,
+        ),
+        tamanhoBytes: Math.max(0, Math.round(arquivo.tamanhoBytes ?? 0)),
+        situacao: "recebido",
       });
     }
 

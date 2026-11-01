@@ -15,9 +15,14 @@ const scriptSrc = emProducao
 // diretiva `connect-src 'self'` NÃO cobre `ws://` no Chrome, e o handshake
 // falha com ERR_INVALID_HTTP_RESPONSE — o runtime de dev fica sem HMR.
 // Liberado apenas fora de produção; em produção não existe HMR.
+// O upload vai do navegador direto para o bucket (PUT assinado), então o
+// endpoint do R2 precisa estar liberado em `connect-src`. Sem isso o fetch é
+// bloqueado pela CSP e o envio falha antes do primeiro byte.
+const connectSrcR2 = "https://*.r2.cloudflarestorage.com";
+
 const connectSrc = emProducao
-  ? "'self' https://api.resend.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.upstash.io"
-  : "'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://api.resend.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.upstash.io";
+  ? `'self' ${connectSrcR2} https://api.resend.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.upstash.io`
+  : `'self' ${connectSrcR2} ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://api.resend.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.upstash.io`;
 
 const securityHeaders = [
   {
@@ -35,7 +40,8 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "img-src 'self' data: https://*.r2.cloudflarestorage.com https://assets.seudominio.com.br",
+      // `*.r2.dev` é o domínio público do bucket de imagens (R2_PUBLIC_URL).
+      "img-src 'self' data: blob: https://*.r2.dev https://*.r2.cloudflarestorage.com https://assets.seudominio.com.br",
       `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
@@ -66,6 +72,8 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "assets.seudominio.com.br" },
+      // Bucket público do R2 (R2_PUBLIC_URL: https://pub-….r2.dev).
+      { protocol: "https", hostname: "*.r2.dev" },
       { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "guiabg.com.br" },
     ],

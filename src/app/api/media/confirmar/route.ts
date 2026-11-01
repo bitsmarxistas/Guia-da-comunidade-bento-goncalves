@@ -4,12 +4,21 @@ import { getAdmin } from "@/lib/auth";
 import { db } from "@/infrastructure/db/client";
 import { anexo, imagem } from "@/infrastructure/db/schema";
 import { enfileirarJob } from "@/infrastructure/queue/queue.service";
+import { chaveValida, PREFIXO_SOLICITACAO_TEMP } from "@/domain/midia/arquivo";
+import { objetoExiste } from "@/infrastructure/r2/client";
 import { eq, sql } from "drizzle-orm";
+
+/*
+ * Registra no banco um arquivo que o navegador já gravou no bucket.
+ *
+ * Só admin: no fluxo público (participação) a linha nasce junto com a
+ * solicitação, dentro da mesma transação — se o envio falhar, não sobra foto
+ * órfã na fila de moderação.
+ */
 
 export async function POST(request: NextRequest) {
   try {
     const admin = await getAdmin();
-
     if (!admin?.id) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
@@ -42,6 +51,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const chaveOk = chaveValida(key, {
+        prefixos: [`${PREFIXO_SOLICITACAO_TEMP}/anexos`],
+        finalidade: "anexo",
+      });
+
+      if (!chaveOk || !(await objetoExiste(key))) {
+        return NextResponse.json(
+          { error: "O arquivo não chegou ao servidor. Envie de novo." },
+          { status: 400 },
+        );
+      }
+
       const [novoAnexo] = await db
         .insert(anexo)
         .values({
@@ -59,10 +80,7 @@ export async function POST(request: NextRequest) {
         anexoId: novoAnexo!.id,
       });
 
-      return NextResponse.json({
-        success: true,
-        anexo: novoAnexo,
-      });
+      return NextResponse.json({ success: true, anexo: novoAnexo });
     }
 
     if (tipo === "imagem") {
@@ -73,13 +91,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const prefixos = negocioId
+        ? [`negocios/${negocioId}`]
+        : [PREFIXO_SOLICITACAO_TEMP];
+
+      const chaveOk = chaveValida(key, { prefixos, finalidade: "imagem" });
+      if (!chaveOk || !(await objetoExiste(key))) {
+        return NextResponse.json(
+          { error: "A imagem não chegou ao servidor. Envie de novo." },
+          { status: 400 },
+        );
+      }
+
       let tipoImagem: "logo" | "foto" = "foto";
       if (negocioId) {
-        const count = await db
-          .select({ count: sql`count(*)` })
+        const [contagem] = await db
+          .select({ total: sql<number>`count(*)::int` })
           .from(imagem)
           .where(eq(imagem.negocioId, negocioId));
-        if (Number(count[0]?.count ?? 0) === 0) {
+
+        if (Number(contagem?.total ?? 0) === 0) {
           tipoImagem = "logo";
         }
       }
@@ -87,8 +118,8 @@ export async function POST(request: NextRequest) {
       const [novaImagem] = await db
         .insert(imagem)
         .values({
-          negocioId: negocioId || null,
-          solicitacaoId: solicitacaoId || null,
+          negocioId: negocioId ?? null,
+          solicitacaoId: solicitacaoId ?? null,
           anexoOrigemId: anexoId || null,
           tipo: tipoImagem,
           situacao: "pendente",
@@ -96,25 +127,17 @@ export async function POST(request: NextRequest) {
         })
         .returning();
 
-      await enfileirarJob({
-        tipo: "processar_imagem",
-        imagemId: novaImagem!.id,
-      });
-
-      return NextResponse.json({
-        success: true,
-        imagem: novaImagem,
-      });
+      return NextResponse.json({ success: true, imagem: novaImagem });
     }
 
     return NextResponse.json(
       { error: "Tipo inválido. Use 'imagem' ou 'anexo'" },
       { status: 400 },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Confirmar Upload] Erro:", error);
     return NextResponse.json(
-      { error: error.message ?? "Erro interno" },
+      { error: "Não foi possível registrar o arquivo. Tente de novo." },
       { status: 500 },
     );
   }

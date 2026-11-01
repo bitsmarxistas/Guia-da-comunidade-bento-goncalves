@@ -7,6 +7,10 @@ import { Button } from "@/ui/components/button";
 import { Input } from "@/ui/components/input";
 import { Label } from "@/ui/components/label";
 import { Textarea } from "@/ui/components/textarea";
+import {
+  ImageUpload,
+  type MidiaEnviadaArquivo,
+} from "@/ui/components/image-upload";
 import { criarSolicitacaoAtualizacaoAction } from "@/application/solicitacoes/atualizar";
 
 type Estado = {
@@ -32,6 +36,8 @@ export interface CorrecaoDados {
   endereco: string;
   categorias: Array<{ id: string; nome: string }>;
   categoriasIds: string[];
+  /** Fotos já publicadas na ficha — referência para trocar. */
+  fotos: string[];
 }
 
 /**
@@ -61,6 +67,18 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
   const [selecionadas, setSelecionadas] = useState<string[]>(
     dados.categoriasIds,
   );
+  const [fotosNovas, setFotosNovas] = useState<MidiaEnviadaArquivo[]>([]);
+  const [enviandoFotos, setEnviandoFotos] = useState(false);
+
+  /*
+   * As fotos sobem antes do envio do formulário e voltam como chave + URL.
+   * O `formData.set` é o que leva essa lista para a action — sem isso o
+   * upload aconteceria e o chamado chegaria sem imagem nenhuma.
+   */
+  async function enviarComFotos(formData: FormData) {
+    formData.set("imagens", JSON.stringify(fotosNovas));
+    await acao(formData);
+  }
 
   if (estado.success) {
     return (
@@ -142,7 +160,7 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
   }
 
   return (
-    <form action={acao} className="space-y-5">
+    <form action={enviarComFotos} className="space-y-5">
       {/* Aviso explícito: isto abre chamado, não edita a ficha. */}
       <div className="rounded-[14px] border border-brand/30 bg-brand-tint px-4 py-3 text-sm text-ink">
         <p className="font-semibold">Isto abre um chamado para a equipe</p>
@@ -290,6 +308,51 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
         </div>
       </fieldset>
 
+      <fieldset className="space-y-4 rounded-[22px] border border-line bg-surface p-5">
+        <legend className="px-1 text-[13px] font-semibold text-ink">
+          Fotos
+        </legend>
+        <p className="text-sm text-ink-soft">
+          Envie a foto certa para substituir a que está publicada. A troca passa
+          pela equipe antes de aparecer no guia.
+        </p>
+
+        {dados.fotos.length > 0 ? (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-mute">
+              Publicadas hoje
+            </p>
+            <ul className="mt-2 grid grid-cols-4 gap-2">
+              {dados.fotos.map((foto) => (
+                <li
+                  key={foto}
+                  className="overflow-hidden rounded-[10px] border border-line"
+                >
+                  <img
+                    src={foto}
+                    alt="Foto publicada na ficha"
+                    className="aspect-square w-full object-cover"
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-mute">
+            Esta ficha ainda não tem foto publicada — esta é a chance de incluir
+            a primeira.
+          </p>
+        )}
+
+        <ImageUpload
+          label="Fotos novas"
+          description="JPG, PNG ou WebP até 5 MB · até 4 fotos. A imagem é reduzida antes de subir."
+          maxFiles={4}
+          onUploadComplete={setFotosNovas}
+          onStatusChange={setEnviandoFotos}
+        />
+      </fieldset>
+
       <fieldset className="rounded-[22px] border border-line bg-surface p-5">
         <legend className="px-1 text-[13px] font-semibold text-ink">
           Categorias
@@ -320,8 +383,13 @@ export function CorrecaoForm({ dados }: { dados: CorrecaoDados }) {
         </div>
       </fieldset>
 
-      <Button type="submit" size="lg" disabled={pendente}>
-        {pendente ? (
+      <Button type="submit" size="lg" disabled={pendente || enviandoFotos}>
+        {enviandoFotos ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Enviando as fotos…
+          </>
+        ) : pendente ? (
           <>
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             Enviando…

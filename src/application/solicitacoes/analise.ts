@@ -11,8 +11,9 @@ import {
   localizacao,
   horarioFuncionamento,
   negocioCategoria,
+  imagem,
 } from "@/infrastructure/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   logSolicitacaoAnalisada,
   logVinculacaoSolicitacao,
@@ -147,6 +148,8 @@ export async function analisarSolicitacaoAction(
   }
 
   let resultado: { situacao: string; negocioId?: string } = { situacao: "" };
+  // Quantas fotos do pedido foram liberadas junto com a decisão (auditoria).
+  let fotosAprovadas = 0;
 
   try {
     await db.transaction(async (tx) => {
@@ -289,6 +292,33 @@ export async function analisarSolicitacaoAction(
             });
           }
 
+          /*
+           * Fotos novas do chamado entram no comércio existente.
+           *
+           * Aprovar o chamado também libera as fotos que vieram com ele: o
+           * admin já olhou essas imagens na mesma tela em que decidiu o
+           * chamado, e sem isso a pessoa trocava a foto e ela continuava
+           * esperando uma segunda aprovação. Foto rejeitada antes da decisão
+           * permanece rejeitada.
+           */
+          await tx
+            .update(imagem)
+            .set({ negocioId: alvo.id })
+            .where(eq(imagem.solicitacaoId, solicitacaoId));
+
+          const fotosLiberadas = await tx
+            .update(imagem)
+            .set({ situacao: "aprovada" })
+            .where(
+              and(
+                eq(imagem.solicitacaoId, solicitacaoId),
+                eq(imagem.situacao, "pendente"),
+              ),
+            )
+            .returning({ id: imagem.id });
+
+          fotosAprovadas = fotosLiberadas.length;
+
           await tx
             .update(solicitacao)
             .set({
@@ -405,6 +435,30 @@ export async function analisarSolicitacaoAction(
             }
           }
 
+          /*
+           * As fotos do pedido passam a pertencer ao comércio recém-criado e
+           * são liberadas na mesma decisão: a equipe viu essas imagens na tela
+           * do pedido antes de aprovar o cadastro. Sem isso a ficha nascia sem
+           * foto e a imagem ficava esperando uma segunda aprovação.
+           */
+          await tx
+            .update(imagem)
+            .set({ negocioId: novoNegocio.id })
+            .where(eq(imagem.solicitacaoId, solicitacaoId));
+
+          const fotosLiberadas = await tx
+            .update(imagem)
+            .set({ situacao: "aprovada" })
+            .where(
+              and(
+                eq(imagem.solicitacaoId, solicitacaoId),
+                eq(imagem.situacao, "pendente"),
+              ),
+            )
+            .returning({ id: imagem.id });
+
+          fotosAprovadas = fotosLiberadas.length;
+
           // Atualizar solicitação
           await tx
             .update(solicitacao)
@@ -496,6 +550,7 @@ export async function analisarSolicitacaoAction(
             decisao,
             justificativa: justificativa ?? null,
             situacaoResultante: resultado.situacao,
+            fotosAprovadas,
           },
           snapshotAntes: { situacao: sol.situacao },
           snapshotDepois: {

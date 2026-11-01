@@ -1,14 +1,20 @@
 // src/infrastructure/r2/client.ts
-"use server";
-
 import {
   S3Client,
   PutObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/shared/env";
 
+/*
+ * Cliente do bucket de imagens (Cloudflare R2).
+ *
+ * Este módulo NÃO é `"use server"`: ele guarda a credencial da conta e não pode
+ * ser exposto como server action para o navegador. Quem precisar dele importa
+ * do lado do servidor (rotas, actions e scripts).
+ */
 const r2Client = new S3Client({
   region: "auto",
   endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -19,117 +25,57 @@ const r2Client = new S3Client({
 });
 
 const BUCKET = env.R2_BUCKET_NAME;
-const PUBLIC_URL = env.R2_PUBLIC_URL;
 
-export interface UploadResult {
-  success: boolean;
-  url?: string;
-  key?: string;
-  error?: string;
+export function urlPublicaDaChave(chave: string): string {
+  const base = (env.R2_PUBLIC_URL ?? "").replace(/\/+$/, "");
+  return base ? `${base}/${chave}` : "";
 }
 
-export interface PresignedUploadResult {
-  success: boolean;
-  uploadUrl?: string;
-  key?: string;
-  publicUrl?: string;
-  error?: string;
+export interface AssinaturaUpload {
+  uploadUrl: string;
+  key: string;
+  publicUrl: string;
+  expiresIn: number;
 }
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const ALLOWED_DOC_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
-const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10 MB
-
-export function validateImageFile(file: File): {
-  valid: boolean;
-  error?: string;
-} {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return { valid: false, error: "Formato inválido. Use JPEG, PNG ou WebP." };
-  }
-  if (file.size > MAX_IMAGE_SIZE) {
-    return { valid: false, error: "Arquivo muito grande. Máximo 5 MB." };
-  }
-  return { valid: true };
-}
-
-export function validateDocFile(file: File): {
-  valid: boolean;
-  error?: string;
-} {
-  if (!ALLOWED_DOC_TYPES.includes(file.type)) {
-    return { valid: false, error: "Formato inválido. Use PDF, DOC ou DOCX." };
-  }
-  if (file.size > MAX_DOC_SIZE) {
-    return { valid: false, error: "Arquivo muito grande. Máximo 10 MB." };
-  }
-  return { valid: true };
-}
-
-function generateKey(prefix: string, fileName: string): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 10);
-  const ext = fileName.split(".").pop()?.toLowerCase() || "bin";
-  return `${prefix}/${timestamp}-${random}.${ext}`;
-}
-
-export async function getPresignedUploadUrl(
-  prefix: string,
-  fileName: string,
+/**
+ * URL assinada para o navegador gravar o arquivo direto no R2.
+ *
+ * Vai com `ContentLength` e `ContentType` assinados: o R2 recusa o PUT se o
+ * corpo tiver outro tamanho ou outro tipo, então a URL não serve para subir um
+ * arquivo maior do que o combinado. Isso também contorna o limite de 4,5 MB de
+ * corpo das funções da Vercel — o arquivo nunca passa pelo servidor.
+ */
+export async function assinarUpload(
+  chave: string,
   contentType: string,
-  maxSize: number,
-): Promise<PresignedUploadResult> {
-  try {
-    const key = generateKey(prefix, fileName);
-    const command = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      ContentType: contentType,
-      ContentLength: maxSize,
-    });
+  tamanhoBytes: number,
+  expiresIn = 900,
+): Promise<AssinaturaUpload> {
+  const comando = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: chave,
+    ContentType: contentType,
+    ContentLength: tamanhoBytes,
+  });
 
-    const uploadUrl = await getSignedUrl(r2Client, command, {
-      expiresIn: 3600,
-    }); // 1 hour
-    const publicUrl = PUBLIC_URL ? `${PUBLIC_URL}/${key}` : "";
+  const uploadUrl = await getSignedUrl(r2Client, comando, { expiresIn });
 
-    return {
-      success: true,
-      uploadUrl,
-      key,
-      publicUrl,
-    };
-  } catch (error) {
-    console.error("Error generating presigned URL:", error);
-    return { success: false, error: "Falha ao gerar URL de upload" };
-  }
+  return {
+    uploadUrl,
+    key: chave,
+    publicUrl: urlPublicaDaChave(chave),
+    expiresIn,
+  };
 }
 
-export async function uploadFileDirect(
-  key: string,
-  body: Buffer | Uint8Array | ReadableStream,
-  contentType: string,
-): Promise<UploadResult> {
+/** Confere se o objeto chegou mesmo ao bucket (usado antes de gravar a linha). */
+export async function objetoExiste(chave: string): Promise<boolean> {
   try {
-    const command = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: body as any,
-      ContentType: contentType,
-    });
-
-    await r2Client.send(command);
-    const publicUrl = PUBLIC_URL ? `${PUBLIC_URL}/${key}` : "";
-
-    return { success: true, url: publicUrl, key };
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    return { success: false, error: "Falha ao fazer upload" };
+    await r2Client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: chave }));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -137,25 +83,10 @@ export async function deleteFile(
   key: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const command = new DeleteObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-    });
-    await r2Client.send(command);
+    await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
     return { success: true };
   } catch (error) {
     console.error("Error deleting file:", error);
     return { success: false, error: "Falha ao excluir arquivo" };
   }
-}
-
-export async function getPresignedDownloadUrl(
-  key: string,
-  expiresIn = 3600,
-): Promise<string> {
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-  });
-  return getSignedUrl(r2Client, command, { expiresIn });
 }

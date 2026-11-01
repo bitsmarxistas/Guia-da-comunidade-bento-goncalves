@@ -16,7 +16,11 @@ import { Input } from "@/ui/components/input";
 import { Label } from "@/ui/components/label";
 import { Textarea } from "@/ui/components/textarea";
 import { Checkbox } from "@/ui/components/checkbox";
-import { ImageUpload, FileUpload } from "@/ui/components/image-upload";
+import {
+  ImageUpload,
+  FileUpload,
+  type MidiaEnviadaArquivo,
+} from "@/ui/components/image-upload";
 import { consultarCepAction } from "@/application/cep/consultar-cep";
 import { formatarCep, normalizarCep } from "@/domain/utils/cep";
 
@@ -161,27 +165,13 @@ export function SolicitarWizard() {
     sobAgendamento: false,
   });
 
-  const [imagens, setImagens] = useState<
-    Array<{
-      key: string;
-      url: string;
-      fileName: string;
-      fileType: string;
-      fileSize: number;
-      preview?: string;
-      tipo: "logo" | "foto";
-    }>
-  >([]);
-  const [anexos, setAnexos] = useState<
-    Array<{
-      key: string;
-      url: string;
-      fileName: string;
-      fileType: string;
-      fileSize: number;
-      nomeOriginal: string;
-    }>
-  >([]);
+  const [imagens, setImagens] = useState<MidiaEnviadaArquivo[]>([]);
+  const [anexos, setAnexos] = useState<MidiaEnviadaArquivo[]>([]);
+  // Enquanto o PUT no bucket não termina, a foto ainda não tem URL: avançar
+  // ou enviar agora gravaria a solicitação sem ela.
+  const [enviandoFotos, setEnviandoFotos] = useState(false);
+  const [enviandoAnexos, setEnviandoAnexos] = useState(false);
+  const midiaEmEnvio = enviandoFotos || enviandoAnexos;
 
   const [termos, setTermos] = useState<
     Array<{ tipo: string; versao: string; conteudo: string }>
@@ -289,6 +279,9 @@ export function SolicitarWizard() {
     }
 
     if (etapa === 3 && erroHorario) return setErro(erroHorario);
+    if (etapa === 3 && midiaEmEnvio) {
+      return setErro("Aguarde o envio das fotos terminar para continuar.");
+    }
 
     irPara(Math.min(4, etapa + 1));
   };
@@ -380,6 +373,12 @@ export function SolicitarWizard() {
 
     if (!aceiteTermos) {
       return setErro("É preciso aceitar os termos para enviar.");
+    }
+
+    if (midiaEmEnvio) {
+      return setErro(
+        "Ainda estamos enviando suas fotos. Espere o envio terminar para enviar o cadastro.",
+      );
     }
 
     setEnviando(true);
@@ -860,9 +859,9 @@ export function SolicitarWizard() {
                 </div>
                 <ImageUpload
                   tipo="foto"
-                  maxFiles={5}
-                  solicitacaoId=""
+                  maxFiles={4}
                   onUploadComplete={setImagens}
+                  onStatusChange={setEnviandoFotos}
                 />
               </div>
 
@@ -1077,7 +1076,10 @@ export function SolicitarWizard() {
                     Opcional. PDF, DOC ou DOCX até 10 MB.
                   </p>
                 </div>
-                <FileUpload solicitacaoId="" onUploadComplete={setAnexos} />
+                <FileUpload
+                  onUploadComplete={setAnexos}
+                  onStatusChange={setEnviandoAnexos}
+                />
               </div>
             </section>
           ) : null}

@@ -1,375 +1,552 @@
 // src/ui/components/image-upload.tsx
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { useActionState } from "react";
-import { Button } from "@/ui/components/button";
-import { Input } from "@/ui/components/input";
-import { Label } from "@/ui/components/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
-import { Progress } from "@/ui/components/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/ui/components/alert";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  X,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
   Image as ImageIcon,
   Loader2,
-  CheckCircle,
+  RotateCcw,
   Upload,
+  X,
 } from "lucide-react";
+import { Button } from "@/ui/components/button";
+import { Label } from "@/ui/components/label";
 import { cn } from "@/lib/utils";
+import {
+  LIMITE_ANEXO_BYTES,
+  LIMITE_IMAGEM_BYTES,
+  MAX_ANEXOS_POR_SOLICITACAO,
+  MAX_FOTOS_POR_SOLICITACAO,
+  MIMES_ANEXO,
+  MIMES_IMAGEM,
+} from "@/domain/midia/arquivo";
 
-interface BaseUploadedFile {
+/*
+ * Envio de fotos e anexos do site.
+ *
+ * O arquivo vai do navegador direto para o bucket: pedimos uma URL assinada em
+ * /api/media/upload-url, gravamos com PUT e devolvemos ao formulário apenas a
+ * chave e a URL pública. Antes este componente "simulava" o upload — gerava uma
+ * chave falsa `temp/...` e mandava o preview local —, então a foto nunca
+ * chegava ao servidor, a fila de moderação ficava vazia e nada podia ser
+ * aprovado ou publicado.
+ *
+ * Fotos são reduzidas para no máximo 1600 px e convertidas em WebP antes de
+ * subir: uma foto de celular de 4 MB vira ~300 KB, o que cabe no limite de
+ * corpo da Vercel caso a assinatura falhe e a imagem precise ser reenviada.
+ */
+
+export interface MidiaEnviadaArquivo {
   key: string;
   url: string;
   fileName: string;
   fileType: string;
   fileSize: number;
-  preview?: string;
-}
-
-interface ImageUploadedFile extends BaseUploadedFile {
-  tipo: "logo" | "foto";
-}
-
-interface FileUploadedFile extends BaseUploadedFile {
-  nomeOriginal: string;
-}
-
-type UploadedFile = ImageUploadedFile | FileUploadedFile;
-
-interface ImageUploadProps {
-  label?: string;
-  description?: string;
-  maxFiles?: number;
-  acceptedTypes?: string[];
-  maxSizeMB?: number;
   tipo?: "logo" | "foto";
-  solicitacaoId?: string;
-  onUploadComplete?: (files: ImageUploadedFile[]) => void;
-  initialFiles?: ImageUploadedFile[];
-  disabled?: boolean;
 }
 
-interface FileUploadProps {
+interface ItemEnvio {
+  id: string;
+  arquivo: File;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  preview?: string;
+  estado: "enviando" | "enviada" | "erro";
+  progresso: number;
+  erro?: string;
+  key?: string;
+  url?: string;
+}
+
+interface PropsBase {
   label?: string;
   description?: string;
   maxFiles?: number;
-  acceptedTypes?: string[];
   maxSizeMB?: number;
-  solicitacaoId?: string;
-  onUploadComplete?: (files: FileUploadedFile[]) => void;
-  initialFiles?: FileUploadedFile[];
+  /** Comércio existente: só o painel manda, e o servidor exige admin. */
+  negocioId?: string;
   disabled?: boolean;
+  onUploadComplete?: (arquivos: MidiaEnviadaArquivo[]) => void;
+  /** Avisa o formulário quando ainda há envio em andamento. */
+  onStatusChange?: (enviando: boolean) => void;
+}
+
+interface ImageUploadProps extends PropsBase {
+  tipo?: "logo" | "foto";
+  initialFiles?: MidiaEnviadaArquivo[];
+}
+
+type FileUploadProps = PropsBase;
+
+const MAX_LADO_IMAGEM = 1600;
+const QUALIDADE_IMAGEM = 0.82;
+
+function formatarTamanho(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function idLocal(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/**
+ * Reduz a foto antes de subir. Devolve `null` quando o navegador não consegue
+ * decodificar (formato estranho, arquivo corrompido) — nesse caso o original é
+ * enviado, desde que caiba no limite.
+ */
+async function comprimirImagem(arquivo: File): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(arquivo);
+    const maiorLado = Math.max(bitmap.width, bitmap.height);
+    const escala =
+      maiorLado > MAX_LADO_IMAGEM ? MAX_LADO_IMAGEM / maiorLado : 1;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+
+    const contexto = canvas.getContext("2d");
+    if (!contexto) {
+      bitmap.close?.();
+      return null;
+    }
+
+    contexto.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+
+    const convertido = await new Promise<Blob | null>((resolver) => {
+      canvas.toBlob(resolver, "image/webp", QUALIDADE_IMAGEM);
+    });
+
+    if (!convertido || convertido.type !== "image/webp") return null;
+    return convertido;
+  } catch {
+    return null;
+  }
+}
+
+function enviarParaBucket(
+  urlAssinada: string,
+  corpo: Blob,
+  mimeType: string,
+  aoProgredir: (percentual: number) => void,
+): Promise<void> {
+  return new Promise((resolver, rejeitar) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", urlAssinada);
+    xhr.setRequestHeader("Content-Type", mimeType);
+    xhr.timeout = 60_000;
+
+    xhr.upload.onprogress = (evento) => {
+      if (evento.lengthComputable && evento.total > 0) {
+        aoProgredir(Math.round((evento.loaded / evento.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        aoProgredir(100);
+        resolver();
+      } else {
+        rejeitar(
+          new Error(
+            "O servidor de imagens recusou o arquivo. Tente enviar de novo.",
+          ),
+        );
+      }
+    };
+    xhr.onerror = () =>
+      rejeitar(new Error("Falha de conexão ao enviar o arquivo."));
+    xhr.ontimeout = () =>
+      rejeitar(new Error("O envio demorou demais. Tente de novo."));
+
+    xhr.send(corpo);
+  });
+}
+
+async function pedirUrlAssinada(dados: {
+  finalidade: "imagem" | "anexo";
+  mimeType: string;
+  tamanhoBytes: number;
+  negocioId?: string;
+}): Promise<{ uploadUrl: string; key: string; url: string }> {
+  const resposta = await fetch("/api/media/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+
+  const corpo = (await resposta.json().catch(() => null)) as {
+    uploadUrl?: string;
+    key?: string;
+    url?: string;
+    error?: string;
+  } | null;
+
+  if (!resposta.ok || !corpo?.uploadUrl || !corpo.key || !corpo.url) {
+    throw new Error(
+      corpo?.error ?? "Não foi possível preparar o envio. Tente de novo.",
+    );
+  }
+
+  return { uploadUrl: corpo.uploadUrl, key: corpo.key, url: corpo.url };
 }
 
 export function ImageUpload({
-  label = "Imagens",
-  description = "Arraste ou clique para adicionar imagens (JPEG, PNG, WebP - máx 5MB)",
-  // Guia (§5.5): até 4 fotos, JPG ou PNG.
-  maxFiles = 4,
-  acceptedTypes = ["image/jpeg", "image/png"],
-  maxSizeMB = 5,
+  label = "Fotos",
+  description = "Até 4 fotos em JPG, PNG ou WebP, com no máximo 5 MB cada.",
+  maxFiles = MAX_FOTOS_POR_SOLICITACAO,
+  maxSizeMB = LIMITE_IMAGEM_BYTES / (1024 * 1024),
   tipo = "foto",
-  solicitacaoId,
-  onUploadComplete,
-  initialFiles = [],
+  negocioId,
   disabled = false,
+  onUploadComplete,
+  onStatusChange,
+  initialFiles = [],
 }: ImageUploadProps) {
-  const [files, setFiles] = useState<ImageUploadedFile[]>(initialFiles);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [actionState, formAction] = useActionState(
-    async (prevState: unknown, formData: FormData) => {
-      // This will be replaced by the actual server action
-      return { error: "Not implemented" };
+  const [itens, setItens] = useState<ItemEnvio[]>(() =>
+    initialFiles.map((arquivo) => ({
+      id: idLocal(),
+      arquivo: new File([], arquivo.fileName, { type: arquivo.fileType }),
+      fileName: arquivo.fileName,
+      fileType: arquivo.fileType,
+      fileSize: arquivo.fileSize,
+      estado: "enviada" as const,
+      progresso: 100,
+      key: arquivo.key,
+      url: arquivo.url,
+    })),
+  );
+  const [erroGeral, setErroGeral] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const callbacksRef = useRef({ onUploadComplete, onStatusChange });
+
+  // Sincronizar os callbacks em efeito (e não no corpo do componente): o React
+  // proíbe escrever em ref durante a renderização.
+  useEffect(() => {
+    callbacksRef.current = { onUploadComplete, onStatusChange };
+  }, [onUploadComplete, onStatusChange]);
+
+  const atualizar = useCallback((id: string, mudanca: Partial<ItemEnvio>) => {
+    setItens((atual) =>
+      atual.map((item) => (item.id === id ? { ...item, ...mudanca } : item)),
+    );
+  }, []);
+
+  const enviarArquivo = useCallback(
+    async (item: ItemEnvio) => {
+      atualizar(item.id, {
+        estado: "enviando",
+        progresso: 0,
+        erro: undefined,
+      });
+
+      try {
+        const comprimido = await comprimirImagem(item.arquivo);
+        const corpo: Blob = comprimido ?? item.arquivo;
+        const mimeType = comprimido
+          ? "image/webp"
+          : item.arquivo.type || "image/jpeg";
+
+        const assinatura = await pedirUrlAssinada({
+          finalidade: "imagem",
+          mimeType,
+          tamanhoBytes: corpo.size,
+          ...(negocioId ? { negocioId } : {}),
+        });
+
+        await enviarParaBucket(
+          assinatura.uploadUrl,
+          corpo,
+          mimeType,
+          (percentual) => atualizar(item.id, { progresso: percentual }),
+        );
+
+        atualizar(item.id, {
+          estado: "enviada",
+          progresso: 100,
+          key: assinatura.key,
+          url: assinatura.url,
+          fileType: mimeType,
+          fileSize: corpo.size,
+        });
+      } catch (erro) {
+        atualizar(item.id, {
+          estado: "erro",
+          progresso: 0,
+          erro:
+            erro instanceof Error
+              ? erro.message
+              : "Não foi possível enviar a imagem.",
+        });
+      }
     },
-    null,
+    [atualizar, negocioId],
   );
 
-  const validateFile = useCallback(
-    (file: File): string | null => {
-      if (!acceptedTypes.includes(file.type)) {
-        return `Formato inválido: ${file.name}. Use ${acceptedTypes.join(", ")}.`;
+  const adicionar = useCallback(
+    async (selecionados: FileList) => {
+      setErroGeral("");
+      const espaco = maxFiles - itens.length;
+      if (espaco <= 0) {
+        setErroGeral(`Limite de ${maxFiles} fotos atingido.`);
+        return;
       }
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        return `Arquivo muito grande: ${file.name}. Máximo ${maxSizeMB}MB.`;
-      }
-      return null;
-    },
-    [acceptedTypes, maxSizeMB],
-  );
 
-  const handleFileSelect = useCallback(
-    async (selectedFiles: FileList) => {
-      const newFiles = Array.from(selectedFiles);
-      const errors: string[] = [];
-      const validFiles: ImageUploadedFile[] = [];
+      const aceitos: File[] = [];
+      const recusados: string[] = [];
 
-      for (const file of newFiles) {
-        const error = validateFile(file);
-        if (error) {
-          errors.push(error);
+      for (const arquivo of Array.from(selecionados)) {
+        if (aceitos.length >= espaco) {
+          recusados.push(
+            `Limite de ${maxFiles} fotos: "${arquivo.name}" ficou de fora.`,
+          );
           continue;
         }
 
-        if (files.length + validFiles.length >= maxFiles) {
-          errors.push(`Limite de ${maxFiles} arquivos atingido.`);
-          break;
+        const tipoPermitido = (MIMES_IMAGEM as readonly string[]).includes(
+          arquivo.type,
+        );
+        if (!tipoPermitido) {
+          recusados.push(`"${arquivo.name}": envie JPG, PNG ou WebP.`);
+          continue;
+        }
+        if (arquivo.size > maxSizeMB * 1024 * 1024) {
+          recusados.push(`"${arquivo.name}" passa de ${maxSizeMB} MB.`);
+          continue;
         }
 
-        // Create preview
-        const preview = URL.createObjectURL(file);
-        validFiles.push({
-          key: "",
-          url: "",
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          preview,
-          tipo,
-        });
+        aceitos.push(arquivo);
       }
 
-      if (errors.length > 0) {
-        setError(errors.join("\n"));
-      }
+      if (recusados.length > 0) setErroGeral(recusados.join(" "));
+      if (aceitos.length === 0) return;
 
-      if (validFiles.length > 0) {
-        setFiles((prev) => [...prev, ...validFiles]);
-        setError("");
-      }
-    },
-    [files.length, maxFiles, tipo, validateFile],
-  );
+      const novos: ItemEnvio[] = aceitos.map((arquivo) => ({
+        id: idLocal(),
+        arquivo,
+        fileName: arquivo.name,
+        fileType: arquivo.type,
+        fileSize: arquivo.size,
+        preview: URL.createObjectURL(arquivo),
+        estado: "enviando",
+        progresso: 0,
+      }));
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files);
+      setItens((atual) => [...atual, ...novos]);
+      for (const item of novos) {
+        void enviarArquivo(item);
       }
     },
-    [handleFileSelect],
+    [enviarArquivo, itens.length, maxFiles, maxSizeMB],
   );
 
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => {
-      const file = prev[index];
-      if (!file) return prev;
-      if (file.preview) URL.revokeObjectURL(file.preview);
-      return prev.filter((_, i) => i !== index);
+  const remover = useCallback((id: string) => {
+    setItens((atual) => {
+      const alvo = atual.find((item) => item.id === id);
+      if (alvo?.preview) URL.revokeObjectURL(alvo.preview);
+      return atual.filter((item) => item.id !== id);
     });
   }, []);
 
-  const uploadFiles = useCallback(async () => {
-    const filesToUpload = files.filter((f) => !f.key); // Only upload new files
-    if (filesToUpload.length === 0) return;
+  const enviando = itens.some((item) => item.estado === "enviando");
 
-    setUploading(true);
-    setError("");
+  useEffect(() => {
+    const concluidos: MidiaEnviadaArquivo[] = itens
+      .filter((item) => item.estado === "enviada" && item.key && item.url)
+      .map((item) => ({
+        key: item.key!,
+        url: item.url!,
+        fileName: item.fileName,
+        fileType: item.fileType,
+        fileSize: item.fileSize,
+        tipo,
+      }));
 
-    try {
-      // Get presigned URLs for all files
-      const uploadPromises = filesToUpload.map(async (file) => {
-        const formData = new FormData();
-        formData.append("solicitacaoId", solicitacaoId || "");
-        formData.append("tipo", tipo);
-        formData.append("fileName", file.fileName);
-        formData.append("fileType", file.fileType);
-        formData.append("fileSize", String(file.fileSize));
-
-        // Note: In a real implementation, we'd call the server action here
-        // For now, we'll simulate the response
-        return {
-          ...file,
-          key: `temp/${Date.now()}-${file.fileName}`,
-          url: file.preview || "",
-        };
-      });
-
-      const results = await Promise.all(uploadPromises);
-
-      setFiles((prev) =>
-        prev.map((f) => {
-          const result = results.find(
-            (r) => r.fileName === f.fileName && !r.key,
-          );
-          return result ? { ...f, key: result.key, url: result.url } : f;
-        }),
-      );
-
-      if (onUploadComplete) {
-        onUploadComplete(
-          files.map((f) => {
-            const result = results.find((r) => r.fileName === f.fileName);
-            return result ? { ...f, key: result.key, url: result.url } : f;
-          }),
-        );
-      }
-    } catch (err) {
-      setError("Falha ao fazer upload das imagens");
-    } finally {
-      setUploading(false);
-    }
-  }, [files, solicitacaoId, tipo, onUploadComplete]);
-
-  const triggerFileInput = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-        handleFileSelect(e.target.files);
-        e.target.value = "";
-      }
-    },
-    [handleFileSelect],
-  );
+    callbacksRef.current.onUploadComplete?.(concluidos);
+    callbacksRef.current.onStatusChange?.(enviando);
+  }, [itens, tipo, enviando]);
 
   return (
-    <div className="space-y-4">
-      <Label htmlFor="image-upload" className="block text-sm font-medium">
+    <div className="space-y-3">
+      <Label className="block text-[13px] font-semibold text-ink">
         {label}
       </Label>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-sm text-ink-soft">{description}</p>
 
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Erro</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {erroGeral ? (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-[10px] border border-critical/30 bg-critical-tint px-3 py-2 text-sm text-critical"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {erroGeral}
+        </p>
+      ) : null}
 
-      {/* Drop Zone */}
       <div
         className={cn(
-          "relative border-2 border-dashed rounded-xl p-8 text-center transition-colors",
-          "border-border bg-background hover:border-primary/50",
-          disabled && "opacity-50 cursor-not-allowed",
+          "relative rounded-[14px] border-2 border-dashed border-line bg-canvas p-6 text-center transition-colors",
+          disabled
+            ? "cursor-not-allowed opacity-60"
+            : "cursor-pointer hover:border-brand/50",
         )}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={disabled ? undefined : triggerFileInput}
+        onClick={disabled ? undefined : () => inputRef.current?.click()}
+        onDragOver={(evento) => {
+          evento.preventDefault();
+          evento.stopPropagation();
+        }}
+        onDrop={(evento) => {
+          evento.preventDefault();
+          evento.stopPropagation();
+          if (!disabled && evento.dataTransfer.files.length > 0) {
+            void adicionar(evento.dataTransfer.files);
+          }
+        }}
         role="button"
         tabIndex={disabled ? -1 : 0}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled) {
-            e.preventDefault();
-            triggerFileInput();
+        onKeyDown={(evento) => {
+          if ((evento.key === "Enter" || evento.key === " ") && !disabled) {
+            evento.preventDefault();
+            inputRef.current?.click();
           }
         }}
       >
         <input
-          ref={fileInputRef}
+          ref={inputRef}
           id="image-upload"
           type="file"
           multiple
-          accept={acceptedTypes.join(",")}
-          onChange={handleInputChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          disabled={disabled || files.length >= maxFiles}
-          aria-label={`Upload de ${label.toLowerCase()}`}
+          accept={MIMES_IMAGEM.join(",")}
+          className="absolute inset-0 size-full cursor-pointer opacity-0"
+          disabled={disabled || itens.length >= maxFiles}
+          onChange={(evento) => {
+            if (evento.target.files && evento.target.files.length > 0) {
+              void adicionar(evento.target.files);
+            }
+            evento.target.value = "";
+          }}
+          aria-label="Escolher fotos"
         />
-        <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <Upload
+          className="mx-auto mb-2 size-8 text-ink-mute"
+          aria-hidden="true"
+        />
+        <p className="text-sm text-ink-soft">
           {disabled
-            ? "Upload desabilitado"
-            : files.length >= maxFiles
-              ? `Limite de ${maxFiles} imagens atingido`
-              : `Clique ou arraste até ${maxFiles} imagens`}
+            ? "Envio desabilitado"
+            : itens.length >= maxFiles
+              ? `Limite de ${maxFiles} fotos atingido`
+              : `Clique ou arraste até ${maxFiles} fotos`}
         </p>
-        <p className="text-xs text-muted-foreground/70 mt-1">
-          {acceptedTypes.join(", ")} • até {maxSizeMB}MB cada
+        <p className="mt-1 text-xs text-ink-mute">
+          JPG, PNG ou WebP · até {maxSizeMB} MB cada
         </p>
       </div>
 
-      {/* Preview Grid */}
-      {files.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {files.map((file, index) => (
-            <div
-              key={index}
-              className="relative group aspect-square rounded-lg overflow-hidden border bg-muted"
+      {itens.length > 0 ? (
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {itens.map((item) => (
+            <li
+              key={item.id}
+              className="relative overflow-hidden rounded-[12px] border border-line bg-surface"
             >
-              {file.preview ? (
-                <img
-                  src={file.preview}
-                  alt={file.fileName}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  <ImageIcon className="h-8 w-8" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                {file.preview && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="bg-white/90 text-muted-foreground hover:text-foreground"
-                    onClick={() => window.open(file.preview!, "_blank")}
-                    aria-label="Visualizar imagem"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
+              <div className="relative aspect-square bg-brand-tint">
+                {item.preview ? (
+                  <img
+                    src={item.preview}
+                    alt={item.fileName}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center text-ink-mute">
+                    <ImageIcon className="size-6" aria-hidden="true" />
+                  </div>
                 )}
-                {!disabled && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="bg-white/90 text-red-500 hover:text-red-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(index);
-                    }}
-                    aria-label="Remover imagem"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
+
+                {item.estado === "enviando" ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-ink/60 text-on-brand">
+                    <Loader2
+                      className="size-5 animate-spin"
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-semibold">
+                      {item.progresso}%
+                    </span>
+                  </div>
+                ) : null}
+
+                {item.estado === "erro" ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-critical/80 p-2 text-center text-on-brand">
+                    <AlertCircle className="size-5" aria-hidden="true" />
+                    <span className="text-[11px] leading-snug">
+                      Não foi enviada
+                    </span>
+                  </div>
+                ) : null}
+
+                {item.estado === "enviada" ? (
+                  <CheckCircle2
+                    className="absolute right-1.5 top-1.5 size-5 rounded-full bg-surface text-positive"
+                    aria-hidden="true"
+                  />
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={(evento) => {
+                    evento.stopPropagation();
+                    remover(item.id);
+                  }}
+                  className="absolute left-1.5 top-1.5 inline-flex size-7 items-center justify-center rounded-full bg-surface/90 text-ink-soft transition-colors hover:text-critical focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                  aria-label={`Remover ${item.fileName}`}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
               </div>
-              {file.key && (
-                <div className="absolute bottom-1 right-1">
-                  <CheckCircle className="h-4 w-4 text-green-500 bg-white/90 rounded-full" />
-                </div>
-              )}
-              <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 rounded truncate max-w-[80px]">
-                {file.fileName}
+
+              <div className="space-y-1 p-2">
+                <p className="truncate text-xs font-medium text-ink">
+                  {item.fileName}
+                </p>
+                <p className="text-[11px] text-ink-mute">
+                  {formatarTamanho(item.fileSize)}
+                </p>
+                {item.estado === "erro" ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] leading-snug text-critical">
+                      {item.erro ?? "Falha no envio."}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-full text-xs"
+                      onClick={(evento) => {
+                        evento.stopPropagation();
+                        void enviarArquivo(item);
+                      }}
+                    >
+                      <RotateCcw className="size-3.5" aria-hidden="true" />
+                      Tentar de novo
+                    </Button>
+                  </div>
+                ) : null}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
-      )}
+        </ul>
+      ) : null}
 
-      {files.filter((f) => !f.key).length > 0 && !uploading && (
-        <div className="flex justify-end">
-          <Button onClick={uploadFiles} disabled={uploading}>
-            {uploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              "Fazer Upload"
-            )}
-          </Button>
-        </div>
-      )}
-
-      {uploading && <Progress value={50} className="h-2" />}
-
-      <p className="text-xs text-muted-foreground">
-        {files.length}/{maxFiles} imagens selecionadas
+      <p className="text-xs text-ink-mute" aria-live="polite">
+        {itens.filter((item) => item.estado === "enviada").length}/{maxFiles}{" "}
+        fotos enviadas
+        {enviando ? " · enviando…" : ""}
       </p>
     </div>
   );
@@ -377,208 +554,252 @@ export function ImageUpload({
 
 export function FileUpload({
   label = "Anexos",
-  description = "Arraste ou clique para adicionar documentos (PDF, DOC, DOCX - máx 10MB)",
-  maxFiles = 5,
-  acceptedTypes = [
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ],
-  maxSizeMB = 10,
-  solicitacaoId,
-  onUploadComplete,
-  initialFiles = [],
+  description = "Opcional. PDF, DOC ou DOCX até 10 MB.",
+  maxFiles = MAX_ANEXOS_POR_SOLICITACAO,
+  maxSizeMB = LIMITE_ANEXO_BYTES / (1024 * 1024),
+  negocioId,
   disabled = false,
+  onUploadComplete,
+  onStatusChange,
 }: FileUploadProps) {
-  const [files, setFiles] = useState<FileUploadedFile[]>(initialFiles);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [itens, setItens] = useState<ItemEnvio[]>([]);
+  const [erroGeral, setErroGeral] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const callbacksRef = useRef({ onUploadComplete, onStatusChange });
 
-  const getFileIcon = (type: string) => {
-    if (type.includes("pdf")) return "📄";
-    if (type.includes("word") || type.includes("doc")) return "📝";
-    return "📎";
-  };
+  // Sincronizar os callbacks em efeito (e não no corpo do componente): o React
+  // proíbe escrever em ref durante a renderização.
+  useEffect(() => {
+    callbacksRef.current = { onUploadComplete, onStatusChange };
+  }, [onUploadComplete, onStatusChange]);
 
-  const validateFile = useCallback(
-    (file: File): string | null => {
-      if (!acceptedTypes.includes(file.type)) {
-        return `Formato inválido: ${file.name}. Use ${acceptedTypes.join(", ")}.`;
-      }
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        return `Arquivo muito grande: ${file.name}. Máximo ${maxSizeMB}MB.`;
-      }
-      return null;
-    },
-    [acceptedTypes, maxSizeMB],
-  );
+  const atualizar = useCallback((id: string, mudanca: Partial<ItemEnvio>) => {
+    setItens((atual) =>
+      atual.map((item) => (item.id === id ? { ...item, ...mudanca } : item)),
+    );
+  }, []);
 
-  const handleFileSelect = useCallback(
-    (selectedFiles: FileList) => {
-      const newFiles = Array.from(selectedFiles);
-      const errors: string[] = [];
-      const validFiles: FileUploadedFile[] = [];
+  const enviarArquivo = useCallback(
+    async (item: ItemEnvio) => {
+      atualizar(item.id, { estado: "enviando", progresso: 0, erro: undefined });
 
-      for (const file of newFiles) {
-        const error = validateFile(file);
-        if (error) {
-          errors.push(error);
-          continue;
-        }
+      try {
+        const mimeType = item.arquivo.type || "application/pdf";
+        const assinatura = await pedirUrlAssinada({
+          finalidade: "anexo",
+          mimeType,
+          tamanhoBytes: item.arquivo.size,
+          ...(negocioId ? { negocioId } : {}),
+        });
 
-        if (files.length + validFiles.length >= maxFiles) {
-          errors.push(`Limite de ${maxFiles} arquivos atingido.`);
-          break;
-        }
+        await enviarParaBucket(
+          assinatura.uploadUrl,
+          item.arquivo,
+          mimeType,
+          (percentual) => atualizar(item.id, { progresso: percentual }),
+        );
 
-        validFiles.push({
-          key: "",
-          url: "",
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          nomeOriginal: file.name,
+        atualizar(item.id, {
+          estado: "enviada",
+          progresso: 100,
+          key: assinatura.key,
+          url: assinatura.url,
+          fileType: mimeType,
+          fileSize: item.arquivo.size,
+        });
+      } catch (erro) {
+        atualizar(item.id, {
+          estado: "erro",
+          progresso: 0,
+          erro:
+            erro instanceof Error
+              ? erro.message
+              : "Não foi possível enviar o anexo.",
         });
       }
-
-      if (errors.length > 0) {
-        setError(errors.join("\n"));
-      }
-
-      if (validFiles.length > 0) {
-        setFiles((prev) => [...prev, ...validFiles]);
-        setError("");
-      }
     },
-    [files.length, maxFiles, validateFile],
+    [atualizar, negocioId],
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+  const adicionar = useCallback(
+    (selecionados: FileList) => {
+      setErroGeral("");
+      const espaco = maxFiles - itens.length;
+      if (espaco <= 0) {
+        setErroGeral(`Limite de ${maxFiles} anexos atingido.`);
+        return;
+      }
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files);
+      const aceitos: File[] = [];
+      const recusados: string[] = [];
+
+      for (const arquivo of Array.from(selecionados)) {
+        if (aceitos.length >= espaco) {
+          recusados.push(`Limite de ${maxFiles} anexos.`);
+          continue;
+        }
+        if (!(MIMES_ANEXO as readonly string[]).includes(arquivo.type)) {
+          recusados.push(`"${arquivo.name}": envie PDF, DOC ou DOCX.`);
+          continue;
+        }
+        if (arquivo.size > maxSizeMB * 1024 * 1024) {
+          recusados.push(`"${arquivo.name}" passa de ${maxSizeMB} MB.`);
+          continue;
+        }
+        aceitos.push(arquivo);
+      }
+
+      if (recusados.length > 0) setErroGeral(recusados.join(" "));
+      if (aceitos.length === 0) return;
+
+      const novos: ItemEnvio[] = aceitos.map((arquivo) => ({
+        id: idLocal(),
+        arquivo,
+        fileName: arquivo.name,
+        fileType: arquivo.type,
+        fileSize: arquivo.size,
+        estado: "enviando",
+        progresso: 0,
+      }));
+
+      setItens((atual) => [...atual, ...novos]);
+      for (const item of novos) {
+        void enviarArquivo(item);
       }
     },
-    [handleFileSelect],
+    [enviarArquivo, itens.length, maxFiles, maxSizeMB],
   );
 
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const enviando = itens.some((item) => item.estado === "enviando");
 
-  const triggerFileInput = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+  useEffect(() => {
+    const concluidos: MidiaEnviadaArquivo[] = itens
+      .filter((item) => item.estado === "enviada" && item.key && item.url)
+      .map((item) => ({
+        key: item.key!,
+        url: item.url!,
+        fileName: item.fileName,
+        fileType: item.fileType,
+        fileSize: item.fileSize,
+      }));
 
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-        handleFileSelect(e.target.files);
-        e.target.value = "";
-      }
-    },
-    [handleFileSelect],
-  );
+    callbacksRef.current.onUploadComplete?.(concluidos);
+    callbacksRef.current.onStatusChange?.(enviando);
+  }, [itens, enviando]);
 
   return (
-    <div className="space-y-4">
-      <Label htmlFor="file-upload" className="block text-sm font-medium">
+    <div className="space-y-3">
+      <Label className="block text-[13px] font-semibold text-ink">
         {label}
       </Label>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-sm text-ink-soft">{description}</p>
 
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Erro</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {erroGeral ? (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-[10px] border border-critical/30 bg-critical-tint px-3 py-2 text-sm text-critical"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {erroGeral}
+        </p>
+      ) : null}
 
       <div
         className={cn(
-          "relative border-2 border-dashed rounded-xl p-8 text-center transition-colors",
-          "border-border bg-background hover:border-primary/50",
-          disabled && "opacity-50 cursor-not-allowed",
+          "relative rounded-[14px] border-2 border-dashed border-line bg-canvas p-6 text-center transition-colors",
+          disabled
+            ? "cursor-not-allowed opacity-60"
+            : "cursor-pointer hover:border-brand/50",
         )}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={disabled ? undefined : triggerFileInput}
+        onClick={disabled ? undefined : () => inputRef.current?.click()}
         role="button"
         tabIndex={disabled ? -1 : 0}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled) {
-            e.preventDefault();
-            triggerFileInput();
+        onKeyDown={(evento) => {
+          if ((evento.key === "Enter" || evento.key === " ") && !disabled) {
+            evento.preventDefault();
+            inputRef.current?.click();
           }
         }}
       >
         <input
-          ref={fileInputRef}
+          ref={inputRef}
           id="file-upload"
           type="file"
           multiple
-          accept={acceptedTypes.join(",")}
-          onChange={handleInputChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          disabled={disabled || files.length >= maxFiles}
-          aria-label={`Upload de ${label.toLowerCase()}`}
+          accept={MIMES_ANEXO.join(",")}
+          className="absolute inset-0 size-full cursor-pointer opacity-0"
+          disabled={disabled || itens.length >= maxFiles}
+          onChange={(evento) => {
+            if (evento.target.files && evento.target.files.length > 0) {
+              adicionar(evento.target.files);
+            }
+            evento.target.value = "";
+          }}
+          aria-label="Escolher anexos"
         />
-        <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <FileText
+          className="mx-auto mb-2 size-8 text-ink-mute"
+          aria-hidden="true"
+        />
+        <p className="text-sm text-ink-soft">
           {disabled
-            ? "Upload desabilitado"
-            : files.length >= maxFiles
-              ? `Limite de ${maxFiles} arquivos atingido`
-              : `Clique ou arraste até ${maxFiles} documentos`}
+            ? "Envio desabilitado"
+            : itens.length >= maxFiles
+              ? `Limite de ${maxFiles} anexos atingido`
+              : `Clique ou arraste até ${maxFiles} arquivos`}
         </p>
-        <p className="text-xs text-muted-foreground/70 mt-1">
-          PDF, DOC, DOCX • até {maxSizeMB}MB cada
+        <p className="mt-1 text-xs text-ink-mute">
+          PDF, DOC ou DOCX · até {maxSizeMB} MB cada
         </p>
       </div>
 
-      {files.length > 0 && (
-        <div className="space-y-2">
-          {files.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50 group"
+      {itens.length > 0 ? (
+        <ul className="space-y-2">
+          {itens.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-center gap-3 rounded-[10px] border border-line bg-surface p-3"
             >
-              <span className="text-2xl">{getFileIcon(file.fileType)}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{file.fileName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {(file.fileSize / 1024).toFixed(1)} KB
+              <FileText
+                className="size-5 shrink-0 text-ink-mute"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-ink">
+                  {item.fileName}
+                </p>
+                <p className="text-xs text-ink-mute">
+                  {formatarTamanho(item.fileSize)}
+                  {item.estado === "enviando" ? ` · ${item.progresso}%` : ""}
+                  {item.estado === "enviada" ? " · enviado" : ""}
+                  {item.estado === "erro" ? ` · ${item.erro ?? "falhou"}` : ""}
                 </p>
               </div>
-              {!disabled && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(index);
-                  }}
-                  aria-label="Remover arquivo"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+              {item.estado === "enviando" ? (
+                <Loader2
+                  className="size-4 animate-spin text-ink-mute"
+                  aria-hidden="true"
+                />
+              ) : null}
+              <button
+                type="button"
+                onClick={() =>
+                  setItens((atual) => atual.filter((i) => i.id !== item.id))
+                }
+                className="inline-flex size-8 items-center justify-center rounded-full text-ink-soft transition-colors hover:text-critical focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                aria-label={`Remover ${item.fileName}`}
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </li>
           ))}
-        </div>
-      )}
+        </ul>
+      ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        {files.length}/{maxFiles} arquivos selecionados
+      <p className="text-xs text-ink-mute" aria-live="polite">
+        {itens.filter((item) => item.estado === "enviada").length}/{maxFiles}{" "}
+        anexos enviados
+        {enviando ? " · enviando…" : ""}
       </p>
     </div>
   );

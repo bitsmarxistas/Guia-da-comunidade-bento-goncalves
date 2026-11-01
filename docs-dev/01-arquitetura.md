@@ -56,13 +56,23 @@ ME-01 (solicitação) e ME-02 (publicação) são funções puras em
 
 ### Mídia (upload → moderação)
 
-1. `POST /api/media/upload-url` (admin) gera URL assinada no R2.
-2. `POST /api/media/confirmar` cria `imagem`/`anexo` e enfileira um `job`.
-3. Worker `application/media/processar.service.ts` consome até 10 jobs por
+1. `POST /api/media/upload-url` assina um PUT no R2 (tipo e **tamanho exato**
+   vão na assinatura). É público — o formulário de participação não tem login —
+   e limitado por IP; `negocioId` no corpo só é aceito para admin.
+2. O navegador grava o arquivo direto no bucket. A foto é reduzida para 1600 px
+   e convertida em WebP antes do envio, então o corpo nunca chega perto do
+   limite de 4,5 MB das funções da Vercel.
+3. `POST /api/media/confirmar` (admin, foto de comércio já publicado) grava a
+   linha e enfileira um `job`. No fluxo público a linha nasce junto com a
+   solicitação, na mesma transação, presa a `solicitacao_id` — `negocio_id`
+   fica `NULL` até a aprovação do cadastro.
+4. Worker `application/media/processar.service.ts` consome até 10 jobs por
    execução. **Ele nunca aprova imagem**: a imagem fica `pendente` até a
    moderação humana (RF-057).
-4. `POST /api/admin/imagens/[id]/moderar` aprova/rejeita e grava
-   `log_imagem` + `log_auditoria`.
+5. `POST /api/admin/imagens/[id]/moderar` aprova/rejeita e grava
+   `log_imagem` + `log_auditoria`. Só imagem `aprovada` aparece no site
+   (`podeExibirImagem` aceita o host de `R2_PUBLIC_URL`, `*.r2.dev` e os
+   hosts legados).
 
 ### Auditoria (RF-062 / RF-063)
 

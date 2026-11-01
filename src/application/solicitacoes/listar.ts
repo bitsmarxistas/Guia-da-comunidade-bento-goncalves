@@ -132,6 +132,9 @@ export async function buscarSolicitacaoPorIdAction(
     with: {
       solicitante: true,
       categoriasSugeridas: true,
+      // Nome do comércio já publicado (chamado de correção): a tela mostra a
+      // ficha real, não só o snapshot do pedido.
+      negocio: { columns: { nome: true, slug: true } },
     },
   });
 

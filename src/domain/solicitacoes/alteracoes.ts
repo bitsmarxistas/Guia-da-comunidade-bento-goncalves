@@ -15,9 +15,18 @@ export interface CamposComparaveis {
   categorias: string[];
 }
 
+/**
+ * Campos que o chamado pode propor além dos comparáveis.
+ *
+ * "fotos" não é um campo de texto: o chamado manda fotos novas (arquivos no
+ * bucket) e a equipe aprova a troca. Entra na mesma lista para o painel mostrar
+ * "de → para" junto com o resto.
+ */
+export type CampoDeAlteracao = keyof CamposComparaveis | "categorias" | "fotos";
+
 export interface AlteracaoCampo {
   /** Identificador estável do campo (usado na UI e em relatório). */
-  campo: keyof CamposComparaveis | "categorias";
+  campo: CampoDeAlteracao;
   rotulo: string;
   de: string;
   para: string;
@@ -30,6 +39,7 @@ const ROTULOS: Record<string, string> = {
   bairro: "Bairro",
   endereco: "Endereço",
   categorias: "Categorias",
+  fotos: "Fotos",
 };
 
 function limpar(valor: string | null | undefined): string {

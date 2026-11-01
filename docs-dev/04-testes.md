@@ -2,10 +2,10 @@
 
 ## Duas camadas, dois objetivos
 
-| Camada     | Onde                                | Banco         | Velocidade        | O que prova                                                    |
-| ---------- | ----------------------------------- | ------------- | ----------------- | -------------------------------------------------------------- |
-| Unitário   | `tests/unit/**`, `src/**/*.spec.ts` | não           | ~2 s (216 testes) | regras RN01–RN38, máquinas de estado ME-01..ME-08, utilitários |
-| Integração | `tests/integration/**`              | Postgres real | ~50 s (36 testes) | SQL, transações, constraints, idempotência                     |
+| Camada     | Onde                                | Banco         | Velocidade        | O que prova                                                                                |
+| ---------- | ----------------------------------- | ------------- | ----------------- | ------------------------------------------------------------------------------------------ |
+| Unitário   | `tests/unit/**`, `src/**/*.spec.ts` | não           | ~2 s (268 testes) | regras RN01–RN38, máquinas de estado ME-01..ME-08, mídia (tipo/tamanho/chave), utilitários |
+| Integração | `tests/integration/**`              | Postgres real | ~35 s (49 testes) | SQL, transações, constraints, idempotência, moderação de fotos                             |
 
 ## E2E (Playwright)
 
@@ -34,9 +34,15 @@ Decisões que explicam o formato:
    Bella Napoli" (`pnpm db:seed:completo`). Se já houver servidor no ar na porta,
    reuse com `E2E_BASE_URL=http://127.0.0.1:3100`.
 
-Cobertura atual (9 cenários): home, catálogo, filtro por categoria, busca sem
+Cobertura atual (18 cenários): home, catálogo, filtro por categoria, busca sem
 acento, página do negócio (nome/contatos/endereço), 404 de slug inexistente,
-redirecionamento de `/admin` sem sessão, tela de login e erro de credencial.
+redirecionamento de `/admin` sem sessão, tela de login, erro de credencial,
+carrossel/tema, envio de foto no formulário público (PUT no R2 interceptado) e
+ausência de "Entrar" no topo e no menu mobile.
+
+> **Achado do E2E (2026-11):** o botão "Entrar" no cabeçalho fazia o visitante
+> achar que precisava de conta. Ele saiu do site público; o painel continua em
+> `/admin` (redireciona para `/login`) e o rodapé aponta "Painel da equipe".
 
 > **Achado do E2E:** o `ShareButton` chamava `setState` durante o render. Isso
 > entra em loop de re-render e o React aborta a página com "Too many

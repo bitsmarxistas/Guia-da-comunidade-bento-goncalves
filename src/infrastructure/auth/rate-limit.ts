@@ -2,7 +2,16 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { env } from "@/shared/env";
 
-// Create Redis client only if credentials are available
+/*
+ * Limites por IP.
+ *
+ * Cada finalidade tem o seu próprio balde: antes o login e a solicitação
+ * dividiam o mesmo prefixo do Redis, então quem errasse a senha dez vezes
+ * ficava sem conseguir enviar o cadastro. Sem Redis configurado, cai para uma
+ * janela em memória (suficiente para uma instância; o ideal em produção é o
+ * Upstash).
+ */
+
 const redis =
   env.UPSTASH_REDIS_URL && env.UPSTASH_REDIS_TOKEN
     ? new Redis({
@@ -11,56 +20,79 @@ const redis =
       })
     : null;
 
-// Fallback in-memory rate limiter for when Redis is not configured
+interface ResultadoLimite {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  reset: number;
+}
+
 class InMemoryRatelimit {
   private store = new Map<string, { count: number; resetAt: number }>();
 
-  async limit(key: string) {
-    const now = Date.now();
-    const entry = this.store.get(key);
-    const windowMs = 60 * 1000; // 1 minute
+  constructor(private readonly maximo: number) {}
 
-    if (!entry || now > entry.resetAt) {
-      this.store.set(key, { count: 1, resetAt: now + windowMs });
-      return { success: true, limit: 10, remaining: 9, reset: now + windowMs };
+  async limit(key: string): Promise<ResultadoLimite> {
+    const agora = Date.now();
+    const janelaMs = 60 * 1000;
+    const registro = this.store.get(key);
+
+    if (!registro || agora > registro.resetAt) {
+      this.store.set(key, { count: 1, resetAt: agora + janelaMs });
+      return {
+        success: true,
+        limit: this.maximo,
+        remaining: this.maximo - 1,
+        reset: agora + janelaMs,
+      };
     }
 
-    if (entry.count >= 10) {
-      return { success: false, limit: 10, remaining: 0, reset: entry.resetAt };
+    if (registro.count >= this.maximo) {
+      return {
+        success: false,
+        limit: this.maximo,
+        remaining: 0,
+        reset: registro.resetAt,
+      };
     }
 
-    entry.count++;
+    registro.count++;
     return {
       success: true,
-      limit: 10,
-      remaining: 10 - entry.count,
-      reset: entry.resetAt,
+      limit: this.maximo,
+      remaining: this.maximo - registro.count,
+      reset: registro.resetAt,
     };
   }
 }
 
-const fallbackLimiter = new InMemoryRatelimit();
+function criarLimiter(prefixo: string, maximo: number) {
+  const redisLimiter = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(maximo, "1 m"),
+        analytics: false,
+        prefix: prefixo,
+      })
+    : null;
 
-// Use Redis if available, otherwise fallback to in-memory
-const redisLimiter = redis
-  ? new (require("@upstash/ratelimit").Ratelimit)({
-      redis,
-      limiter: require("@upstash/ratelimit").Ratelimit.slidingWindow(10, "1 m"),
-      analytics: false,
-      prefix: "ratelimit:login",
-    })
-  : null;
+  const memoria = new InMemoryRatelimit(maximo);
 
-export const rateLimitLogin = {
-  async limit(key: string) {
-    if (redisLimiter) return redisLimiter.limit(key);
-    return fallbackLimiter.limit(key);
-  },
-};
+  return {
+    async limit(key: string): Promise<ResultadoLimite> {
+      if (redisLimiter) {
+        return (await redisLimiter.limit(key)) as ResultadoLimite;
+      }
+      return memoria.limit(`${prefixo}:${key}`);
+    },
+  };
+}
 
-export const rateLimitSolicitacao = {
-  async limit(key: string) {
-    if (redisLimiter) return redisLimiter.limit(key);
-    return fallbackLimiter.limit(key);
-  },
-};
+/** Login: 10 tentativas por minuto por IP. */
+export const rateLimitLogin = criarLimiter("ratelimit:login", 10);
+
+/** Envio de solicitação: 5 por minuto por IP. */
+export const rateLimitSolicitacao = criarLimiter("ratelimit:solicitacao", 5);
+
+/** Upload assinado: 20 por minuto por IP (4 fotos + 3 anexos + retentativas). */
+export const rateLimitUpload = criarLimiter("ratelimit:upload", 20);

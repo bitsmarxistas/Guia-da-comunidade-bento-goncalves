@@ -91,12 +91,16 @@ export function HeaderNav({ logado }: { logado: boolean }) {
 
           <ThemeToggle />
 
-          <Link
-            href={logado ? "/admin" : "/login"}
-            className="hidden h-11 items-center rounded-[10px] px-3 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink sm:inline-flex"
-          >
-            {logado ? "Painel" : "Entrar"}
-          </Link>
+          {/* Visitante não vê "Entrar": o guia não pede conta. O atalho para o
+              painel só aparece para quem já está autenticado. */}
+          {logado ? (
+            <Link
+              href="/admin"
+              className="hidden h-11 items-center rounded-[10px] px-3 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink sm:inline-flex"
+            >
+              Painel
+            </Link>
+          ) : null}
 
           <Button asChild size="sm" className="ml-1 hidden sm:inline-flex">
             <Link href="/solicitar">Participar</Link>
@@ -152,15 +156,17 @@ export function HeaderNav({ logado }: { logado: boolean }) {
                   Buscar
                 </Link>
               </li>
-              <li>
-                <Link
-                  href={logado ? "/admin" : "/login"}
-                  onClick={() => setAberto(false)}
-                  className="flex min-h-12 items-center rounded-[10px] px-2 text-base font-semibold text-ink hover:bg-surface-2"
-                >
-                  {logado ? "Painel" : "Entrar"}
-                </Link>
-              </li>
+              {logado ? (
+                <li>
+                  <Link
+                    href="/admin"
+                    onClick={() => setAberto(false)}
+                    className="flex min-h-12 items-center rounded-[10px] px-2 text-base font-semibold text-ink hover:bg-surface-2"
+                  >
+                    Painel
+                  </Link>
+                </li>
+              ) : null}
               <li className="px-2 pt-2 pb-3">
                 <Button asChild className="w-full">
                   <Link href="/solicitar" onClick={() => setAberto(false)}>

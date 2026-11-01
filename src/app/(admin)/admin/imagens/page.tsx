@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/card";
 import { Toaster } from "@/ui/components/sonner";
 import { ImageOff } from "lucide-react";
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
+import { protocoloDaSolicitacao } from "@/domain/solicitacoes/protocolo";
 import {
   ImagemFilaModeracao,
   type ImagemFilaItem,
@@ -13,7 +14,7 @@ import {
 
 async function contarPorSituacao(situacao: string): Promise<number> {
   const linhas = await db
-    .select({ total: sql<number>`count(*)` })
+    .select({ total: sql<number>`count(*)::int` })
     .from(imagem)
     .where(eq(imagem.situacao, situacao));
 
@@ -22,32 +23,36 @@ async function contarPorSituacao(situacao: string): Promise<number> {
 }
 
 export default async function ImagensPage() {
-  const [pendentes, aprovadas, rejeitadas] = await Promise.all([
+  const [pendentes, aprovadas, rejeitadas, fila] = await Promise.all([
     contarPorSituacao("pendente"),
     contarPorSituacao("aprovada"),
     contarPorSituacao("rejeitada"),
+    db
+      .select({
+        id: imagem.id,
+        url: imagem.url,
+        tipo: imagem.tipo,
+        criadoEm: imagem.criadoEm,
+        negocioNome: negocio.nome,
+        negocioSlug: negocio.slug,
+        solicitacaoId: imagem.solicitacaoId,
+      })
+      .from(imagem)
+      .leftJoin(negocio, eq(imagem.negocioId, negocio.id))
+      .where(eq(imagem.situacao, "pendente"))
+      .orderBy(desc(imagem.criadoEm))
+      .limit(50),
   ]);
 
-  const fila = await db
-    .select({
-      id: imagem.id,
-      url: imagem.url,
-      tipo: imagem.tipo,
-      negocioNome: negocio.nome,
-      criadoEm: imagem.criadoEm,
-    })
-    .from(imagem)
-    .leftJoin(negocio, eq(imagem.negocioId, negocio.id))
-    .where(eq(imagem.situacao, "pendente"))
-    .orderBy(desc(imagem.criadoEm))
-    .limit(50);
-
   const imagensPendentes: ImagemFilaItem[] = fila.map(
-    ({ id, url, tipo, negocioNome, criadoEm }) => ({
+    ({ id, url, tipo, negocioNome, negocioSlug, solicitacaoId, criadoEm }) => ({
       id,
       url,
       tipo,
-      negocioNome,
+      negocioNome: negocioNome ?? null,
+      negocioSlug: negocioSlug ?? null,
+      solicitacaoId: solicitacaoId ?? null,
+      protocolo: solicitacaoId ? protocoloDaSolicitacao(solicitacaoId) : null,
       criadoEm,
     }),
   );
@@ -56,7 +61,7 @@ export default async function ImagensPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Imagens"
-        description="Moderar imagens enviadas por solicitantes antes da publicação."
+        description="Moderar fotos enviadas pelos solicitantes antes da publicação."
       />
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -93,9 +98,16 @@ export default async function ImagensPage() {
       </div>
 
       <section aria-labelledby="fila-moderacao" className="space-y-4">
-        <h2 id="fila-moderacao" className="text-lg font-semibold text-ink">
-          Fila de moderação
-        </h2>
+        <div className="space-y-1">
+          <h2 id="fila-moderacao" className="text-lg font-semibold text-ink">
+            Fila de moderação
+          </h2>
+          <p className="text-sm text-ink-soft">
+            Fotos que vieram com um pedido são liberadas quando o cadastro é
+            aprovado. Esta fila mostra o que ficou pendente — foto rejeitada ou
+            enviada depois da publicação.
+          </p>
+        </div>
         {imagensPendentes.length > 0 ? (
           <ImagemFilaModeracao imagens={imagensPendentes} />
         ) : (
@@ -106,8 +118,8 @@ export default async function ImagensPage() {
                 Nenhuma imagem pendente de moderação
               </p>
               <p className="max-w-md text-sm text-ink-soft">
-                Quando solicitantes enviarem imagens para moderação, elas vão
-                aparecer nesta fila para aprovação ou rejeição.
+                Quando alguém enviar fotos junto com o cadastro, elas aparecem
+                aqui para aprovação ou rejeição.
               </p>
             </CardContent>
           </Card>

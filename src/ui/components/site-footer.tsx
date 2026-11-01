@@ -8,10 +8,12 @@ const GUIA = [
   { href: "/solicitar", rotulo: "Participar do guia" },
 ];
 
-const ADMINISTRACAO = [
-  { href: "/login", rotulo: "Entrar" },
-  { href: "/admin", rotulo: "Painel" },
-];
+/*
+ * O guia é público: visitante não tem conta e nada exige login. O rodapé só
+ * aponta para o painel, que é da equipe — o link "Entrar" saiu daqui para não
+ * sugerir que é preciso entrar para usar o site.
+ */
+const ADMINISTRACAO = [{ href: "/admin", rotulo: "Painel da equipe" }];
 
 const LEGAL = [
   { href: "/termos", rotulo: "Termos de uso" },

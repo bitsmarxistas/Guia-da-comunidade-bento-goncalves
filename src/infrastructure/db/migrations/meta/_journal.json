@@ -134,6 +134,13 @@
       "when": 1793482395905,
       "tag": "0018_localizacao_cep_numero_mapa",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793495579100,
+      "tag": "0019_imagem_da_solicitacao",
+      "breakpoints": true
     }
   ]
 }

@@ -38,6 +38,7 @@ import Link from "next/link";
 import { AdminPageHeader } from "@/app/(admin)/_components/admin-shared";
 import { revalidatePath } from "next/cache";
 import { AcaoForm } from "./_components/acao-form";
+import { FotosEnviadas } from "./_components/fotos-enviadas";
 import { classeSituacao, rotuloSituacao } from "@/domain/solicitacoes/situacao";
 
 interface DadosNegocioProposto {
@@ -215,6 +216,11 @@ export default async function SolicitacaoDetailPage({
               </CardContent>
             </Card>
           ) : null}
+
+          <FotosEnviadas
+            solicitacaoId={sol.id}
+            nomeNegocio={sol.negocio?.nome ?? dados.nome ?? null}
+          />
 
           <Card size="sm">
             <CardHeader>
