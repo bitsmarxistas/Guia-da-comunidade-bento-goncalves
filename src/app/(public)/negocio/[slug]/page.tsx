@@ -237,13 +237,21 @@ export default async function NegocioPage({
 
   const { dia: diaAtual, minutos: minutosAgora } = agoraEmSaoPaulo();
   const faixasHoje = porDia.get(diaAtual) ?? [];
-  const abertoAgora = sobAgendamento
-    ? null
-    : faixasHoje.some(
-        (faixa) =>
-          minutosAgora >= emMinutos(faixa.horaAbertura) &&
-          minutosAgora < emMinutos(faixa.horaFechamento),
-      );
+  /*
+   * Sem horário cadastrado a ficha não pode dizer "Fechado agora": isso afirma
+   * um fato que o guia não sabe. A ficha de um espaço que não publica horário
+   * (Sala Hip Hop, consultorias) passa a dizer "Horário não informado", igual
+   * ao card do catálogo.
+   */
+  const semHorario = negocio.horarios.length === 0;
+  const abertoAgora =
+    semHorario || sobAgendamento
+      ? null
+      : faixasHoje.some(
+          (faixa) =>
+            minutosAgora >= emMinutos(faixa.horaAbertura) &&
+            minutosAgora < emMinutos(faixa.horaFechamento),
+        );
 
   const categorias = negocio.categorias
     .map((vinculo) => vinculo.categoria)
@@ -671,14 +679,16 @@ export default async function NegocioPage({
                   <dd className="text-ink">
                     {sobAgendamento
                       ? "Somente sob agendamento"
-                      : faixasHoje.length === 0
-                        ? "Fechado hoje"
-                        : faixasHoje
-                            .map(
-                              (faixa) =>
-                                `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
-                            )
-                            .join(" e ")}
+                      : semHorario
+                        ? "Horário não informado"
+                        : faixasHoje.length === 0
+                          ? "Fechado hoje"
+                          : faixasHoje
+                              .map(
+                                (faixa) =>
+                                  `${horaCurta(faixa.horaAbertura)}–${horaCurta(faixa.horaFechamento)}`,
+                              )
+                              .join(" e ")}
                   </dd>
                 </div>
                 {negocio.localizacao?.endereco ? (
