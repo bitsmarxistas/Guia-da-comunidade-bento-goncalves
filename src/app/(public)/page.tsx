@@ -261,8 +261,9 @@ export default async function HomePage() {
             </ul>
 
             <p className="mt-3 text-sm text-ink-mute">
-              Mostrando as {categoriasPrincipais.length} categorias com mais
-              comércios no guia.
+              {categoriasAtivas.some((categoria) => categoria.total > 0)
+                ? `Mostrando as ${categoriasPrincipais.length} categorias com mais comércios no guia.`
+                : "Mostrando as categorias principais do guia."}
             </p>
 
             {categoriasOcultas.length > 0 ? (
@@ -277,8 +278,7 @@ export default async function HomePage() {
                     className="size-4 transition-transform group-open:rotate-180"
                     aria-hidden="true"
                   />
-                  Ver todas as {categoriasAtivas.length} categorias (+
-                  {categoriasOcultas.length})
+                  Ver todas as {categoriasAtivas.length} categorias
                 </summary>
                 <ul className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {categoriasOcultas.map((categoria) => (
