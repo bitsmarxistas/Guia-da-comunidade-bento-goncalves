@@ -609,6 +609,12 @@ export default async function NegocioPage({
                       </h3>
                     </div>
 
+                    {/*
+                      Todo contato tem o mesmo desenho do WhatsApp: linha com
+                      borda e fundo tintado, que escurece no hover. Antes só o
+                      WhatsApp era um botão; Instagram, telefone, e-mail e site
+                      eram texto solto e ninguém via que dava para clicar.
+                    */}
                     <ul className="mt-2 space-y-1.5">
                       {whatsapps.map((contato) => (
                         <li key={contato.id}>
@@ -616,7 +622,7 @@ export default async function NegocioPage({
                             href={linkWhatsApp(contato.valor, negocio.nome)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-[10px] border border-positive/25 bg-positive-tint px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-positive/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                            className="flex items-center gap-2.5 rounded-[10px] border border-positive/25 bg-positive-tint px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-positive/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                           >
                             <GlifoWhatsApp className="size-4 text-positive" />
                             {formatarTelefone(contato.valor)}
@@ -630,9 +636,9 @@ export default async function NegocioPage({
                             href={`https://instagram.com/${contato.valor.replace(/^@/, "")}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                            className="flex items-center gap-2.5 rounded-[10px] border border-brand/25 bg-brand-tint/50 px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-brand/60 hover:bg-brand-tint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                           >
-                            <GlifoInstagram className="size-4 text-ink-mute" />@
+                            <GlifoInstagram className="size-4 text-brand" />@
                             {contato.valor.replace(/^@/, "")}
                           </a>
                         </li>
@@ -642,10 +648,10 @@ export default async function NegocioPage({
                         <li key={contato.id}>
                           <a
                             href={`tel:${contato.valor.replace(/\D/g, "")}`}
-                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                            className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                           >
                             <Phone
-                              className="size-4 text-ink-mute"
+                              className="size-4 text-ink-soft"
                               aria-hidden="true"
                             />
                             {formatarTelefone(contato.valor)}
@@ -657,10 +663,10 @@ export default async function NegocioPage({
                         <li key={contato.id}>
                           <a
                             href={`mailto:${contato.valor}`}
-                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                            className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                           >
                             <Mail
-                              className="size-4 text-ink-mute"
+                              className="size-4 text-ink-soft"
                               aria-hidden="true"
                             />
                             {contato.valor}
@@ -678,10 +684,10 @@ export default async function NegocioPage({
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                            className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface-2/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
                           >
                             <ExternalLink
-                              className="size-4 text-ink-mute"
+                              className="size-4 text-ink-soft"
                               aria-hidden="true"
                             />
                             {contato.valor.replace(/^https?:\/\//, "")}
@@ -698,16 +704,19 @@ export default async function NegocioPage({
                 ) : null}
               </div>
 
-              <div className="border-t border-line p-5">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/negocio/${slug}/correcao`}>
-                    <Pencil className="size-4" aria-hidden="true" />
-                    Pedir correção
-                  </Link>
-                </Button>
-                <p className="mt-2 text-xs text-ink-mute">
-                  A resposta da análise chega por e-mail, em até 24 h.
-                </p>
+              {/*
+                Correção é ação da equipe/do dono, não convite ao visitante:
+                link de texto discreto no pé do cartão, em vez de botão de
+                largura inteira competindo com o WhatsApp.
+              */}
+              <div className="border-t border-line px-5 py-3">
+                <Link
+                  href={`/negocio/${slug}/correcao`}
+                  className="inline-flex items-center gap-1.5 text-xs text-ink-mute transition-colors hover:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
+                >
+                  <Pencil className="size-3" aria-hidden="true" />
+                  Informação errada? Pedir correção
+                </Link>
               </div>
             </div>
           </aside>
