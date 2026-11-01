@@ -101,7 +101,7 @@ export function SiteFooter() {
           <p className="flex flex-wrap items-center gap-3">
             <span>Bento Gonçalves · Serra Gaúcha</span>
             <a
-              href="https://github.com/LeonardoMonteblanc/portfolio"
+              href="https://github.com/bitsmarxistas/Guia-da-comunidade-bento-goncalves"
               target="_blank"
               rel="noopener noreferrer"
               className="underline-offset-4 hover:text-footer-hover hover:underline"

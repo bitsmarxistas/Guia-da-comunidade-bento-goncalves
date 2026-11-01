@@ -153,6 +153,9 @@ jobs:
       R2_ACCESS_KEY_ID: ci
       R2_SECRET_ACCESS_KEY: ci
       R2_BUCKET_NAME: ci
+      # Sem isto a rota de upload assina com URL vazia e o teste de foto falha:
+      # é o mesmo valor fictício que os testes de integração usam.
+      R2_PUBLIC_URL: https://pub-exemplo.r2.dev
     steps:
       - uses: actions/checkout@v4
 
