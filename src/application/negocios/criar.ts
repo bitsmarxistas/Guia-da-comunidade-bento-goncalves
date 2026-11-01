@@ -22,7 +22,14 @@ const criarNegocioSchema = z.object({
   contatos: z
     .array(
       z.object({
-        tipo: z.enum(["whatsapp", "telefone", "instagram", "email", "outro"]),
+        tipo: z.enum([
+          "whatsapp",
+          "telefone",
+          "instagram",
+          "email",
+          "site",
+          "outro",
+        ]),
         valor: z.string().min(1),
         ordem: z.number().default(0),
         valido: z.boolean().default(true),
@@ -31,9 +38,15 @@ const criarNegocioSchema = z.object({
     .min(1),
   localizacao: z
     .object({
-      endereco: z.string().optional(),
+      endereco: z.string().max(200).optional(),
       bairro: z.string().max(80).optional(),
-      areaAtendimento: z.string().optional(),
+      areaAtendimento: z.string().max(200).optional(),
+      // Endereço estruturado: os mesmos campos do formulário público.
+      cep: z.string().max(9).optional(),
+      numero: z.string().max(20).optional(),
+      semPontoComercial: z.boolean().optional(),
+      latitude: z.number().min(-90).max(90).nullable().optional(),
+      longitude: z.number().min(-180).max(180).nullable().optional(),
     })
     .optional(),
   horarios: z
@@ -53,17 +66,33 @@ export async function criarNegocioAction(
   prevState: unknown,
   formData: FormData,
 ) {
-  // Parse contatos array
-  const contatosRaw = formData.getAll("contatos");
-  const contatos = contatosRaw.map((c) => JSON.parse(c as string));
+  /*
+   * Listas chegam como UM campo com JSON (é assim que o formulário do painel
+   * monta). O código antigo usava `getAll`, que devolvia `[[...]]` e fazia o
+   * Zod recusar tudo: "Criar comércio" nunca salvava. Aceita os dois formatos
+   * para não quebrar chamadas antigas que mandassem um item por campo.
+   */
+  const listaDoCampo = (nome: string): unknown[] => {
+    const bruto = formData.get(nome);
+    if (typeof bruto === "string" && bruto.trim() !== "") {
+      const analisado = JSON.parse(bruto);
+      return Array.isArray(analisado) ? analisado : [analisado];
+    }
+    return formData
+      .getAll(nome)
+      .map((item) => JSON.parse(item as string))
+      .flatMap((item) => (Array.isArray(item) ? item : [item]));
+  };
+
+  const contatos = listaDoCampo("contatos");
+  const horarios = listaDoCampo("horarios");
 
   const localizacaoRaw = formData.get("localizacao");
-  const localizacao = localizacaoRaw
+  // Nome diferente do import `localizacao`: a variável sombreava a tabela e o
+  // insert explodia com "Cannot read properties of undefined".
+  const localizacaoDados = localizacaoRaw
     ? JSON.parse(localizacaoRaw as string)
     : undefined;
-
-  const horariosRaw = formData.getAll("horarios");
-  const horarios = horariosRaw.map((h) => JSON.parse(h as string));
 
   const categoriasIdsRaw = formData.getAll("categoriasIds");
   const categoriasIds = categoriasIdsRaw.map((id) => id as string);
@@ -72,7 +101,7 @@ export async function criarNegocioAction(
     nome: formData.get("nome"),
     descricao: formData.get("descricao"),
     contatos,
-    localizacao,
+    localizacao: localizacaoDados,
     horarios,
     categoriasIds,
   };
@@ -151,13 +180,26 @@ export async function criarNegocioAction(
       );
     }
 
-    // Inserir localização se fornecida
-    if (loc && (loc.endereco || loc.bairro || loc.areaAtendimento)) {
+    // Inserir localização se fornecida (inclusive CEP/número/coordenadas)
+    if (
+      loc &&
+      (loc.endereco ||
+        loc.bairro ||
+        loc.areaAtendimento ||
+        loc.cep ||
+        loc.numero)
+    ) {
       await tx.insert(localizacao).values({
         negocioId: novoNegocio.id,
         endereco: loc.endereco?.trim() || null,
         bairro: loc.bairro?.trim() || null,
         areaAtendimento: loc.areaAtendimento?.trim() || null,
+        cep: loc.cep?.replace(/\D/g, "") || null,
+        numero: loc.numero?.trim() || null,
+        semPontoComercial: Boolean(loc.semPontoComercial),
+        latitude: typeof loc.latitude === "number" ? loc.latitude : null,
+        longitude: typeof loc.longitude === "number" ? loc.longitude : null,
+        geocodificadoEm: typeof loc.latitude === "number" ? new Date() : null,
       });
     }
 

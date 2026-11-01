@@ -22,7 +22,14 @@ const editarNegocioSchema = z.object({
     .array(
       z.object({
         id: z.string().uuid().optional(),
-        tipo: z.enum(["whatsapp", "telefone", "instagram", "email", "outro"]),
+        tipo: z.enum([
+          "whatsapp",
+          "telefone",
+          "instagram",
+          "email",
+          "site",
+          "outro",
+        ]),
         valor: z.string().min(1),
         ordem: z.number().default(0),
         valido: z.boolean().default(true),
@@ -31,9 +38,15 @@ const editarNegocioSchema = z.object({
     .optional(),
   localizacao: z
     .object({
-      endereco: z.string().optional(),
+      endereco: z.string().max(200).optional(),
       bairro: z.string().max(80).optional(),
-      areaAtendimento: z.string().optional(),
+      areaAtendimento: z.string().max(200).optional(),
+      // Endereço estruturado: os mesmos campos do formulário público.
+      cep: z.string().max(9).optional(),
+      numero: z.string().max(20).optional(),
+      semPontoComercial: z.boolean().optional(),
+      latitude: z.number().min(-90).max(90).nullable().optional(),
+      longitude: z.number().min(-180).max(180).nullable().optional(),
     })
     .optional(),
   horarios: z
@@ -127,25 +140,39 @@ export async function editarNegocioAction(
     const existe = await db.query.localizacao.findFirst({
       where: (l, { eq }) => eq(l.negocioId, id),
     });
+    const valoresLocalizacao = {
+      endereco: dados.localizacao.endereco?.trim() || null,
+      bairro: dados.localizacao.bairro?.trim() || null,
+      areaAtendimento: dados.localizacao.areaAtendimento?.trim() || null,
+      cep: dados.localizacao.cep?.replace(/\D/g, "") || null,
+      numero: dados.localizacao.numero?.trim() || null,
+      semPontoComercial: Boolean(dados.localizacao.semPontoComercial),
+      latitude:
+        typeof dados.localizacao.latitude === "number"
+          ? dados.localizacao.latitude
+          : null,
+      longitude:
+        typeof dados.localizacao.longitude === "number"
+          ? dados.localizacao.longitude
+          : null,
+      geocodificadoEm:
+        typeof dados.localizacao.latitude === "number" ? new Date() : null,
+    };
+
     if (existe) {
       await db
         .update(localizacao)
-        .set({
-          endereco: dados.localizacao.endereco?.trim() || null,
-          bairro: dados.localizacao.bairro?.trim() || null,
-          areaAtendimento: dados.localizacao.areaAtendimento?.trim() || null,
-        })
+        .set(valoresLocalizacao)
         .where(eq(localizacao.negocioId, id));
     } else if (
-      dados.localizacao.endereco ||
-      dados.localizacao.bairro ||
-      dados.localizacao.areaAtendimento
+      valoresLocalizacao.endereco ||
+      valoresLocalizacao.bairro ||
+      valoresLocalizacao.areaAtendimento ||
+      valoresLocalizacao.cep
     ) {
       await db.insert(localizacao).values({
         negocioId: id,
-        endereco: dados.localizacao.endereco?.trim() || null,
-        bairro: dados.localizacao.bairro?.trim() || null,
-        areaAtendimento: dados.localizacao.areaAtendimento?.trim() || null,
+        ...valoresLocalizacao,
       });
     }
   }
