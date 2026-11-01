@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { buscarNegocios, listarCategoriasAtivas } from "@/application/catalogo";
+import { dividirCategorias } from "@/domain/catalogo/categorias-destaque";
 import { Button } from "@/ui/components/button";
 import { ImagemNegocio, primeiraImagem } from "@/ui/components/imagem-negocio";
 import { NegocioCard } from "./_components/negocio-card";
@@ -163,8 +164,13 @@ export default async function HomePage() {
 
   const negocios = resultado.negocios ?? [];
   const categoriasAtivas = categorias ?? [];
-  const categoriasPrincipais = categoriasAtivas.filter((c) => !c.oculta);
-  const categoriasOcultas = categoriasAtivas.filter((c) => c.oculta);
+  /*
+   * "Principais" = as que têm mais comércio publicado; o resto fica atrás do
+   * botão. Antes a divisão era só pela marcação manual de oculta e, sem
+   * nenhuma marcada, a home despejava as 100 categorias.
+   */
+  const { principais: categoriasPrincipais, restantes: categoriasOcultas } =
+    dividirCategorias(categoriasAtivas);
   const achados = negocios.slice(0, 8);
   const destaque = negocios[0];
   const genteDaqui = negocios.slice(0, 3);
@@ -254,6 +260,11 @@ export default async function HomePage() {
               ))}
             </ul>
 
+            <p className="mt-3 text-sm text-ink-mute">
+              Mostrando as {categoriasPrincipais.length} categorias com mais
+              comércios no guia.
+            </p>
+
             {categoriasOcultas.length > 0 ? (
               /*
                * <details> em vez de estado no cliente: funciona sem JavaScript,
@@ -266,7 +277,8 @@ export default async function HomePage() {
                     className="size-4 transition-transform group-open:rotate-180"
                     aria-hidden="true"
                   />
-                  Ver todas as {categoriasAtivas.length} categorias
+                  Ver todas as {categoriasAtivas.length} categorias (+
+                  {categoriasOcultas.length})
                 </summary>
                 <ul className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {categoriasOcultas.map((categoria) => (

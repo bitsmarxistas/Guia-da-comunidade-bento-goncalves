@@ -8,6 +8,7 @@ import {
 import { NegocioCard } from "./negocio-card";
 import { FiltrosPainel } from "./filtros-painel";
 import { Button } from "@/ui/components/button";
+import { dividirCategorias } from "@/domain/catalogo/categorias-destaque";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -111,8 +112,8 @@ export async function CatalogoView({
    * Categorias "ocultas" continuam no filtro, mas recolhidas: a lista principal
    * fica curta e o visitante expande quando quer — sem perder nenhuma opção.
    */
-  const categoriasPrincipais = categorias.filter((c) => !c.oculta);
-  const categoriasOcultas = categorias.filter((c) => c.oculta);
+  const { principais: categoriasPrincipais, restantes: categoriasOcultas } =
+    dividirCategorias(categorias, 12);
 
   const idsPorSlug = new Map(categorias.map((c) => [c.slug, c.id]));
   const nomesPorSlug = new Map(categorias.map((c) => [c.slug, c.nome]));

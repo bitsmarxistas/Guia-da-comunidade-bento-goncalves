@@ -385,13 +385,33 @@ export async function listarCategoriasAtivas(
 ) {
   const incluirOcultas = opcoes.incluirOcultas ?? false;
 
-  return db.query.categoria.findMany({
-    where: (c, { eq, and }) =>
+  /*
+   * `total` = comércios publicados na categoria. A home usa esse número para
+   * escolher quais são as "principais": antes a divisão era só pela marcação
+   * manual de oculta, e como nenhuma estava marcada o site mostrava as 100
+   * categorias de uma vez.
+   */
+  return db
+    .select({
+      id: categoria.id,
+      nome: categoria.nome,
+      slug: categoria.slug,
+      ativa: categoria.ativa,
+      oculta: categoria.oculta,
+      total: sql<number>`(
+        select count(*)::int
+        from ${negocioCategoria} nc
+        join ${negocio} n on n.id = nc.negocio_id
+        where nc.categoria_id = ${categoria.id} and n.situacao_publicacao = 'publicado'
+      )`,
+    })
+    .from(categoria)
+    .where(
       incluirOcultas
-        ? eq(c.ativa, true)
-        : and(eq(c.ativa, true), eq(c.oculta, false)),
-    orderBy: (c, { asc }) => asc(c.nome),
-  });
+        ? eq(categoria.ativa, true)
+        : and(eq(categoria.ativa, true), eq(categoria.oculta, false)),
+    )
+    .orderBy(asc(categoria.nome));
 }
 
 export interface BairroComTotal {
