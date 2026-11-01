@@ -2,12 +2,15 @@ import { MapPin, ExternalLink, Navigation } from "lucide-react";
 import { comporEndereco } from "@/domain/utils/endereco";
 
 /**
- * Mapa da ficha (§5.4).
+ * Mapa da ficha (§5.4) — Google Maps.
  *
- * Com coordenadas gravadas, embute o mapa do OpenStreetMap (sem chave de API e
- * sem cookies de rastreio). Sem coordenadas, mostra o endereço em texto e dois
- * links de navegação — melhor do que um mapa em branco ou um pin no lugar
- * errado.
+ * Com coordenadas, o pino cai no ponto exato. Sem coordenadas mas com endereço,
+ * a busca do Google resolve pelo texto (é o caso das fichas importadas, que
+ * ainda não foram geocodificadas). Sem nenhum dos dois, entra o aviso — melhor
+ * que um mapa em branco ou um pino no lugar errado.
+ *
+ * O embed `output=embed` do Google Maps funciona sem chave de API; a CSP em
+ * next.config.ts libera `www.google.com` e `maps.google.com` em frame-src.
  */
 export function MapaEndereco({
   nome,
@@ -25,27 +28,26 @@ export function MapaEndereco({
   semPontoComercial: boolean;
 }) {
   const textoCompleto = comporEndereco({ endereco, bairro });
-  const consulta = encodeURIComponent(textoCompleto);
   const temCoordenadas =
     typeof latitude === "number" && typeof longitude === "number";
 
-  const delta = 0.004;
-  const bbox = temCoordenadas
-    ? [
-        (longitude as number) - delta,
-        (latitude as number) - delta,
-        (longitude as number) + delta,
-        (latitude as number) + delta,
-      ].join("%2C")
-    : null;
+  // Pino exato quando há coordenadas; senão o Google procura pelo endereço.
+  const alvo = temCoordenadas
+    ? `${latitude},${longitude}`
+    : textoCompleto.trim();
+
+  const consulta = encodeURIComponent(alvo);
+  const temMapa = alvo.length > 0;
 
   return (
     <div className="mt-3 overflow-hidden rounded-[22px] border border-line bg-surface">
-      {temCoordenadas && bbox ? (
+      {temMapa ? (
         <iframe
-          title={`Mapa com a localização de ${nome}`}
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitude}%2C${longitude}`}
+          title={`Mapa do Google com a localização de ${nome}`}
+          src={`https://www.google.com/maps?q=${consulta}&hl=pt-BR&z=16&output=embed`}
           loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
           className="h-[280px] w-full border-0"
         />
       ) : (
@@ -54,7 +56,7 @@ export function MapaEndereco({
           <p className="max-w-[34ch] px-4 text-sm text-ink-soft">
             {semPontoComercial
               ? "Atende sem ponto comercial fixo."
-              : "Ainda não temos as coordenadas desta ficha para desenhar o mapa."}
+              : "Esta ficha ainda não tem endereço para desenhar o mapa."}
           </p>
         </div>
       )}
@@ -66,30 +68,32 @@ export function MapaEndereco({
             aria-hidden="true"
           />
           <span>
-            {textoCompleto}
+            {textoCompleto || "Endereço não informado"}
             {semPontoComercial ? " (sem ponto comercial)" : ""}
           </span>
         </p>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={`https://www.openstreetmap.org/search?query=${consulta}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm font-semibold text-ink hover:border-brand hover:text-brand"
-          >
-            <Navigation className="size-4" aria-hidden="true" />
-            Abrir no mapa
-          </a>
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${consulta}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm font-semibold text-ink hover:border-brand hover:text-brand"
-          >
-            <ExternalLink className="size-4" aria-hidden="true" />
-            Rota
-          </a>
-        </div>
+        {temMapa ? (
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${consulta}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+            >
+              <Navigation className="size-4" aria-hidden="true" />
+              Abrir no mapa
+            </a>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${consulta}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
+            >
+              <ExternalLink className="size-4" aria-hidden="true" />
+              Rota
+            </a>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -46,8 +46,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
       `connect-src ${connectSrc}`,
-      // Mapa da ficha: embed do OpenStreetMap (sem chave de API).
-      "frame-src 'self' https://www.openstreetmap.org",
+      // Mapa da ficha: embed do Google Maps (output=embed, sem chave de API).
+      "frame-src 'self' https://www.google.com https://maps.google.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
